@@ -11,19 +11,14 @@ import google.auth.transport.requests
 # ----------------------------------------------------------------------------
 # Configuration / Secrets
 # ----------------------------------------------------------------------------
-# For security, store these in Streamlit secrets or environment variables.
-# Example usage: st.secrets["google_client_id"]
-# Or: os.environ.get("GOOGLE_CLIENT_ID")
-# Make sure to configure your Google Cloud OAuth Consent Screen & credentials.
+# Access your Google OAuth credentials from the 'google' section in Streamlit secrets.
+GOOGLE_CLIENT_ID = st.secrets["google"]["client_id"]
+GOOGLE_CLIENT_SECRET = st.secrets["google"]["client_secret"]
+REDIRECT_URI = st.secrets["google"]["redirect_uri"]
 
-GOOGLE_CLIENT_ID = st.secrets.get("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = st.secrets.get("GOOGLE_CLIENT_SECRET", "")
-GOOGLE_DISCOVERY_URL = (
-    "https://accounts.google.com/.well-known/openid-configuration"
-)
+GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
 
-# The SCOPES you need for basic profile info (email, name, etc.).
-# Adjust if you need other OAuth scopes, e.g., to read Google Drive, etc.
+# Scopes required for basic profile info (email, name, etc.)
 SCOPES = ["openid", "email", "profile"]
 
 # ----------------------------------------------------------------------------
@@ -38,65 +33,63 @@ def get_google_oauth_flow():
         client_config={
             "web": {
                 "client_id": GOOGLE_CLIENT_ID,
-                "project_id": "YOUR_PROJECT_ID",
+                "project_id": "YOUR_PROJECT_ID",  # Replace with your actual project id
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://accounts.google.com/o/oauth2/token",
                 "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
                 "client_secret": GOOGLE_CLIENT_SECRET,
                 "redirect_uris": [
-                    # For local development, match the URL used by your app
-                    "http://localhost:8501"
+                    REDIRECT_URI  # Use the production redirect URI from secrets
                 ],
+                # For javascript origins, remove any trailing slash
                 "javascript_origins": [
-                    "http://localhost:8501"
+                    REDIRECT_URI.rstrip("/")
                 ]
             }
         },
         scopes=SCOPES,
-        redirect_uri="http://localhost:8501"
+        redirect_uri=REDIRECT_URI
     )
 
 def sign_in_with_google():
     """
     Initiates the OAuth flow and returns user info after successful sign-in.
 
-    NOTE: In a typical web app, you'd have a separate callback route. 
+    NOTE: In a typical web app, you'd have a separate callback route.
     In Streamlit, you can handle it in-app, but you need to manage 
-    the redirection carefully. This function is a simplified approach.
+    the redirection carefully. This function provides a simplified approach.
     """
     flow = get_google_oauth_flow()
 
-    # Get authorization URL from the flow
+    # Get the authorization URL from the flow
     auth_url, _ = flow.authorization_url(prompt="consent")
     st.write("Click the button below to authorize with Google:")
     if st.button("Sign in with Google"):
-        # In a normal web app, you'd redirect the user to auth_url
-        # For demonstration, open in new tab (not fully automatic):
+        # Display a link for the user to authorize with Google.
         st.markdown(f"[Authorize with Google]({auth_url})")
 
-    st.write("**After you authorize, you’ll get a code from Google**. " 
+    st.write("**After you authorize, you'll get a code from Google.** " 
              "Paste it below to complete sign-in:")
 
     auth_code = st.text_input("Enter the authorization code here:")
     if auth_code:
         try:
-            # Exchange authorization code for a token
+            # Exchange the authorization code for a token
             flow.fetch_token(code=auth_code)
             credentials = flow.credentials
 
-            # Use the ID token to get user info
+            # Verify the ID token to get user info
             request_session = google.auth.transport.requests.Request()
             id_info = id_token.verify_oauth2_token(
                 credentials.id_token, request_session, GOOGLE_CLIENT_ID
             )
 
-            # Extract relevant profile info
+            # Extract relevant profile information
             user_email = id_info.get("email")
             user_name = id_info.get("name", "")
-            # Or id_info["picture"] for user avatar, etc.
+            # Optionally, get the user's picture: id_info.get("picture")
 
             st.success(f"Signed in successfully as {user_name} ({user_email})!")
-
             return {
                 "email": user_email,
                 "name": user_name,
@@ -105,4 +98,3 @@ def sign_in_with_google():
             st.error(f"An error occurred during sign-in: {e}")
 
     return None
-
