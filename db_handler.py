@@ -21,26 +21,17 @@ def run_query(query, params=None):
     """
     Execute a SQL query. If it's a SELECT or includes a RETURNING clause,
     return the resulting rows as a list of dictionaries.
-    Otherwise, perform the operation and return None.
-
-    Args:
-        query (str): The SQL query to run.
-        params (tuple or dict, optional): Parameters to pass with the query.
-
-    Returns:
-        list[dict] or None: Rows as dictionaries if applicable, else None.
+    Otherwise, commit and return None.
     """
     conn = get_connection()
     try:
         with conn:
             with conn.cursor() as cur:
                 cur.execute(query, params)
-                # Check if it's a SELECT or has a RETURNING clause.
-                # If so, fetch the results; otherwise, just commit.
                 lower_query = query.strip().lower()
+                # If SELECT or returning, fetch rows
                 if lower_query.startswith("select") or " returning " in lower_query:
-                    rows = cur.fetchall()  # fetch the returned rows
-                    return rows
+                    return cur.fetchall()
                 else:
                     conn.commit()
                     return None
@@ -54,10 +45,6 @@ def run_transaction(query, params=None):
     """
     Execute a SQL query that modifies data (INSERT, UPDATE, DELETE)
     and commit the changes.
-
-    Args:
-        query (str): The SQL query to run.
-        params (tuple or dict, optional): Parameters to pass with the query.
     """
     conn = get_connection()
     try:
