@@ -46,7 +46,7 @@ def get_google_oauth_flow():
 def sign_in_with_google():
     """
     Initiates the OAuth flow and returns user info after successful sign-in.
-    
+
     Flow:
       1. If the user is already signed in (stored in session state), return that info.
       2. Check if the URL contains an authorization code (using st.query_params).
@@ -54,29 +54,29 @@ def sign_in_with_google():
          - Mark the code as consumed, clear query parameters, and rerun the app.
       3. If no code is present, display a sign-in button that sends the user to Google.
     """
-    # Return early if already signed in.
+    # Return early if the user is already signed in.
     if "user_info" in st.session_state:
         return st.session_state["user_info"]
 
-    query_params = st.query_params
-
+    # Use the new API for reading query parameters.
+    query_params = st.query_params()
     if "code" in query_params:
-        # Check if we've already processed this code.
+        # Prevent reprocessing if we've already used this code.
         if st.session_state.get("code_consumed", False):
             return st.session_state.get("user_info", None)
 
         # Reconstruct the full authorization response URL.
         query_string = urllib.parse.urlencode(query_params, doseq=True)
         authorization_response = f"{REDIRECT_URI}?{query_string}"
-        
+
         try:
             flow = get_google_oauth_flow()
             if "state" in query_params:
                 flow.state = query_params["state"][0]
             elif "state" in st.session_state:
                 flow.state = st.session_state["state"]
-            
-            # Pass the full URL for token exchange.
+
+            # Pass the full authorization response URL for token exchange.
             flow.fetch_token(authorization_response=authorization_response)
             credentials = flow.credentials
 
@@ -92,8 +92,8 @@ def sign_in_with_google():
             st.success(f"Signed in successfully as {user_name} ({user_email})!")
             st.session_state["code_consumed"] = True
 
-            # Clear query parameters by calling without arguments.
-            st.experimental_set_query_params()
+            # Clear query parameters using the new API.
+            st.set_query_params()
             st.experimental_rerun()
             return st.session_state["user_info"]
 
@@ -102,6 +102,7 @@ def sign_in_with_google():
             return None
 
     else:
+        # No authorization code found; generate the auth URL.
         flow = get_google_oauth_flow()
         auth_url, state = flow.authorization_url(prompt="consent")
         st.session_state["state"] = state
