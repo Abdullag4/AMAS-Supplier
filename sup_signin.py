@@ -9,22 +9,28 @@ import google.auth.transport.requests
 # ----------------------------------------------------------------------------
 GOOGLE_CLIENT_ID = st.secrets["google"]["client_id"]
 GOOGLE_CLIENT_SECRET = st.secrets["google"]["client_secret"]
-REDIRECT_URI = st.secrets["google"]["redirect_uri"]
-# Example: "https://amas-supplier.streamlit.app/"
+REDIRECT_URI = st.secrets["google"]["redirect_uri"]  # e.g., "https://amas-supplier.streamlit.app/"
 
+# Use full scope URLs to match what Google returns.
 SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile"
 ]
 
+# ----------------------------------------------------------------------------
+# Functions
+# ----------------------------------------------------------------------------
+
 def get_google_oauth_flow():
-    """Creates and configures the Google OAuth Flow object."""
+    """
+    Creates and configures the Google OAuth Flow object.
+    """
     return Flow.from_client_config(
         client_config={
             "web": {
                 "client_id": GOOGLE_CLIENT_ID,
-                "project_id": "YOUR_PROJECT_ID",  # Replace with your actual project
+                "project_id": "YOUR_PROJECT_ID",  # Replace with your actual project id
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://accounts.google.com/o/oauth2/token",
                 "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
@@ -40,41 +46,40 @@ def get_google_oauth_flow():
 def sign_in_with_google():
     """
     Initiates the OAuth flow and returns user info after successful sign-in.
-
-    1. If user_info in session_state, return it.
-    2. Check if there's an authorization code in st.experimental_get_query_params().
-       - If yes, exchange it, mark code consumed, clear query params, rerun.
-    3. If no code, show a sign-in button linking to Google.
+    
+    Flow:
+      1. If user info is already stored in session state, return it.
+      2. Check if the URL contains an authorization code (using st.experimental_get_query_params).
+         - If yes, reconstruct the full redirect URL and exchange it for tokens.
+         - Mark the code as consumed, clear the query parameters, and rerun the app.
+      3. If no code is present, display a sign-in button that sends the user to Google.
     """
+    # Return early if already signed in.
     if "user_info" in st.session_state:
         return st.session_state["user_info"]
 
-    # Use old experimental function to read query params
+    # Read query parameters using the experimental API.
     query_params = st.experimental_get_query_params()
-
     if "code" in query_params:
-        # Avoid reusing the one-time code
+        # Prevent reprocessing if we've already used this code.
         if st.session_state.get("code_consumed", False):
             return st.session_state.get("user_info", None)
 
-        # Reconstruct the full URL
+        # Reconstruct the full authorization response URL.
         query_string = urllib.parse.urlencode(query_params, doseq=True)
         authorization_response = f"{REDIRECT_URI}?{query_string}"
 
         try:
             flow = get_google_oauth_flow()
-
-            # Apply state if present
             if "state" in query_params:
                 flow.state = query_params["state"][0]
             elif "state" in st.session_state:
                 flow.state = st.session_state["state"]
 
-            # Exchange the code
+            # Exchange the full URL (with query parameters) for tokens.
             flow.fetch_token(authorization_response=authorization_response)
             credentials = flow.credentials
 
-            # Verify ID token
             request_session = google.auth.transport.requests.Request()
             id_info = id_token.verify_oauth2_token(
                 credentials.id_token, request_session, GOOGLE_CLIENT_ID
@@ -87,14 +92,12 @@ def sign_in_with_google():
             st.success(f"Signed in successfully as {user_name} ({user_email})!")
             st.session_state["code_consumed"] = True
 
-            # Clear query params with the old experimental function
-            st.experimental_set_query_params()
-            
-            # Rerun if possible
+            # Clear query parameters using experimental_set_query_params.
+            st.experimental_set_query_params({})
             if hasattr(st, "experimental_rerun"):
                 st.experimental_rerun()
             else:
-                st.warning("Please refresh manually to continue.")
+                st.write("Please refresh the page to continue.")
                 st.stop()
 
             return st.session_state["user_info"]
@@ -104,13 +107,13 @@ def sign_in_with_google():
             return None
 
     else:
-        # No auth code -> show sign-in button
+        # No authorization code present; generate the auth URL.
         flow = get_google_oauth_flow()
         auth_url, state = flow.authorization_url(prompt="consent")
         st.session_state["state"] = state
 
-        st.write("Click the button to authorize with Google:")
+        st.write("Click the button below to authorize with Google:")
         if st.button("Sign in with Google"):
             st.markdown(f"[Authorize with Google]({auth_url})")
-
+        st.write("After authorizing, you'll be redirected back with an authorization code.")
         return None
