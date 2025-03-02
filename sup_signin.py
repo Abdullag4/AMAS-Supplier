@@ -54,12 +54,12 @@ def sign_in_with_google():
          - Mark the code as consumed, clear query parameters, and rerun the app.
       3. If no code is present, display a sign-in button that sends the user to Google.
     """
-    # Return early if the user is already signed in.
+    # Return early if already signed in.
     if "user_info" in st.session_state:
         return st.session_state["user_info"]
 
-    # Use the new API for reading query parameters.
-    query_params = st.query_params()
+    # Access query parameters as an attribute, not a function.
+    query_params = st.query_params
     if "code" in query_params:
         # Prevent reprocessing if we've already used this code.
         if st.session_state.get("code_consumed", False):
@@ -102,7 +102,6 @@ def sign_in_with_google():
             return None
 
     else:
-        # No authorization code found; generate the auth URL.
         flow = get_google_oauth_flow()
         auth_url, state = flow.authorization_url(prompt="consent")
         st.session_state["state"] = state
