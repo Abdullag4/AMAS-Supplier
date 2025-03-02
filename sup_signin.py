@@ -34,38 +34,35 @@ def get_google_oauth_flow():
 
 def sign_in_with_google():
     """
-    1. If user_info in session, return it.
-    2. Otherwise, check if there's a 'code' in st.query_params (the new API).
-       - If yes, exchange the code for tokens, store user info, clear the code, rerun.
-    3. If no code, show a "Sign in with Google" button.
+    Google Sign-In flow using old 'experimental' query parameter functions,
+    since your environment doesn't actually support the new st.set_query_params().
     """
+    # 1. Check if user already in session
     if "user_info" in st.session_state:
         return st.session_state["user_info"]
 
-    # Read query params using new API
-    query_params = st.query_params
+    # 2. Read query params using the experimental function
+    query_params = st.experimental_get_query_params()
     if "code" in query_params:
         # Prevent reusing the code
         if st.session_state.get("code_consumed", False):
             return st.session_state.get("user_info", None)
 
-        # Reconstruct full URL for token exchange
+        # Reconstruct the full redirect URL
         query_string = urllib.parse.urlencode(query_params, doseq=True)
         authorization_response = f"{REDIRECT_URI}?{query_string}"
 
         try:
             flow = get_google_oauth_flow()
-            # Set the state if present
             if "state" in query_params:
                 flow.state = query_params["state"][0]
             elif "state" in st.session_state:
                 flow.state = st.session_state["state"]
 
-            # Exchange the code for tokens
             flow.fetch_token(authorization_response=authorization_response)
             credentials = flow.credentials
 
-            # Verify the ID token for user info
+            # Verify ID token
             request_session = google.auth.transport.requests.Request()
             id_info = id_token.verify_oauth2_token(
                 credentials.id_token, request_session, GOOGLE_CLIENT_ID
@@ -73,7 +70,6 @@ def sign_in_with_google():
 
             user_email = id_info.get("email", "")
             user_name = id_info.get("name", "")
-            # Provide fallback if name is empty
             if not user_name:
                 user_name = user_email.split("@")[0] or "Unnamed Supplier"
 
@@ -81,10 +77,13 @@ def sign_in_with_google():
             st.session_state["code_consumed"] = True
             st.success(f"Signed in successfully as {user_name} ({user_email})!")
 
-            # Clear query params
-            st.set_query_params()
-            # Rerun the app in the same session
-            st.experimental_rerun()
+            # Clear query parameters using experimental_set_query_params
+            st.experimental_set_query_params()
+            if hasattr(st, "experimental_rerun"):
+                st.experimental_rerun()
+            else:
+                st.warning("Please refresh manually to continue.")
+                st.stop()
 
             return st.session_state["user_info"]
 
@@ -93,7 +92,7 @@ def sign_in_with_google():
             return None
 
     else:
-        # No code -> show a sign-in button
+        # 3. No code present -> show button
         flow = get_google_oauth_flow()
         auth_url, state = flow.authorization_url(prompt="consent")
         st.session_state["state"] = state
@@ -102,4 +101,4 @@ def sign_in_with_google():
         if st.button("Sign in with Google"):
             st.markdown(f"[Authorize with Google]({auth_url})")
 
-    return None
+        return None
