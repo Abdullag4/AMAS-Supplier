@@ -55,24 +55,16 @@ def sign_in_with_google():
     """
     Initiates the OAuth flow and returns user info after successful sign-in.
 
-    NOTE: In a typical web app, you'd have a separate callback route.
-    In Streamlit, you can handle it in-app, but you need to manage 
-    the redirection carefully. This function provides a simplified approach.
+    This version automatically checks for the authorization code in the URL
+    query parameters (using st.experimental_get_query_params) so that the user
+    doesn't have to manually copy-paste it.
     """
     flow = get_google_oauth_flow()
 
-    # Get the authorization URL from the flow
-    auth_url, _ = flow.authorization_url(prompt="consent")
-    st.write("Click the button below to authorize with Google:")
-    if st.button("Sign in with Google"):
-        # Display a link for the user to authorize with Google.
-        st.markdown(f"[Authorize with Google]({auth_url})")
-
-    st.write("**After you authorize, you'll get a code from Google.** " 
-             "Paste it below to complete sign-in:")
-
-    auth_code = st.text_input("Enter the authorization code here:")
-    if auth_code:
+    # Check if an authorization code is present in the URL
+    query_params = st.experimental_get_query_params()
+    if "code" in query_params:
+        auth_code = query_params["code"][0]
         try:
             # Exchange the authorization code for a token
             flow.fetch_token(code=auth_code)
@@ -87,8 +79,6 @@ def sign_in_with_google():
             # Extract relevant profile information
             user_email = id_info.get("email")
             user_name = id_info.get("name", "")
-            # Optionally, get the user's picture: id_info.get("picture")
-
             st.success(f"Signed in successfully as {user_name} ({user_email})!")
             return {
                 "email": user_email,
@@ -96,5 +86,14 @@ def sign_in_with_google():
             }
         except Exception as e:
             st.error(f"An error occurred during sign-in: {e}")
+            return None
+
+    # If no code is found, display the sign-in prompt
+    auth_url, _ = flow.authorization_url(prompt="consent")
+    st.write("Click the button below to authorize with Google:")
+    if st.button("Sign in with Google"):
+        st.markdown(f"[Authorize with Google]({auth_url})")
+
+    st.write("After authorizing, you will be redirected back with an authorization code.")
 
     return None
