@@ -90,7 +90,11 @@ def sign_in_with_google():
 
             # Clear query parameters and re-run the app to trigger dashboard display
             st.experimental_set_query_params()
-            st.experimental_rerun()
+            if hasattr(st, "experimental_rerun"):
+                st.experimental_rerun()
+            else:
+                st.write("Please refresh the page to continue.")
+                st.stop()
 
             return st.session_state["user_info"]
         except Exception as e:
