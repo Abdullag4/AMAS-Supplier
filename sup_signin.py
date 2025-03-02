@@ -1,4 +1,5 @@
 import streamlit as st
+import urllib.parse
 from google_auth_oauthlib.flow import Flow
 from google.oauth2 import id_token
 import google.auth.transport.requests
@@ -50,11 +51,11 @@ def sign_in_with_google():
       1. If the user is already signed in (stored in session state), return that info.
       2. Check if the URL contains an authorization code (using st.query_params).
          - Process it only if it hasn't been consumed yet.
-         - Exchange the code for tokens, store the user info, then mark the code as consumed,
-           clear the query parameters, and rerun.
+         - Reconstruct the full authorization response URL and exchange it for tokens.
+         - Store the user info, mark the code as consumed, clear query params, and rerun.
       3. If no code is present, display a sign-in button that sends the user to Google.
     """
-    # If already signed in, return the stored user info.
+    # Return if already signed in.
     if "user_info" in st.session_state:
         return st.session_state["user_info"]
 
@@ -63,23 +64,22 @@ def sign_in_with_google():
     if "code" in query_params:
         # Check if we've already processed this code.
         if st.session_state.get("code_consumed", False):
-            # The code was already processed—return the stored user info.
             return st.session_state.get("user_info", None)
-
-        auth_code = query_params["code"][0]
-        # Optionally retrieve the state from query parameters.
-        state_param = query_params.get("state", [None])[0]
+        
+        # Reconstruct the full authorization response URL.
+        query_string = urllib.parse.urlencode(query_params, doseq=True)
+        authorization_response = f"{REDIRECT_URI}?{query_string}"
+        
         try:
-            # Reinitialize the Flow.
             flow = get_google_oauth_flow()
-            # Set the state on the Flow using the query value or stored state.
-            if state_param:
-                flow.state = state_param
+            # Use the state from query parameters if available.
+            if "state" in query_params:
+                flow.state = query_params["state"][0]
             elif "state" in st.session_state:
                 flow.state = st.session_state["state"]
-
-            # Exchange the authorization code for tokens.
-            flow.fetch_token(code=auth_code)
+            
+            # Pass the full URL to fetch_token.
+            flow.fetch_token(authorization_response=authorization_response)
             credentials = flow.credentials
 
             # Verify the ID token to get user info.
@@ -93,11 +93,9 @@ def sign_in_with_google():
 
             st.session_state["user_info"] = {"email": user_email, "name": user_name}
             st.success(f"Signed in successfully as {user_name} ({user_email})!")
-            
-            # Mark this code as consumed so we don't try to process it again.
             st.session_state["code_consumed"] = True
-            
-            # Clear query parameters to prevent reusing the code.
+
+            # Clear the query parameters and rerun the app.
             st.experimental_set_query_params({})
             st.experimental_rerun()
             return st.session_state["user_info"]
@@ -110,7 +108,6 @@ def sign_in_with_google():
         # No authorization code present; generate the auth URL.
         flow = get_google_oauth_flow()
         auth_url, state = flow.authorization_url(prompt="consent")
-        # Save the state to session state so it can be reused later.
         st.session_state["state"] = state
 
         st.write("Click the button below to authorize with Google:")
