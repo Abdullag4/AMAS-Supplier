@@ -54,7 +54,7 @@ def sign_in_with_google():
          - Mark the code as consumed, clear query parameters, and rerun the app.
       3. If no code is present, display a sign-in button that sends the user to Google.
     """
-    # Return early if the user is already signed in.
+    # Return early if already signed in.
     if "user_info" in st.session_state:
         return st.session_state["user_info"]
 
@@ -76,7 +76,7 @@ def sign_in_with_google():
             elif "state" in st.session_state:
                 flow.state = st.session_state["state"]
 
-            # Exchange the full URL (with query params) for tokens.
+            # Exchange the full URL for tokens.
             flow.fetch_token(authorization_response=authorization_response)
             credentials = flow.credentials
 
@@ -92,9 +92,16 @@ def sign_in_with_google():
             st.success(f"Signed in successfully as {user_name} ({user_email})!")
             st.session_state["code_consumed"] = True
 
-            # Clear query parameters to avoid reusing the code.
-            st.experimental_set_query_params()
-            st.experimental_rerun()
+            # Clear query parameters using the new API.
+            st.query_params({})  # Clear by calling st.query_params as a setter.
+            
+            # Rerun the app if possible.
+            if hasattr(st, "experimental_rerun"):
+                st.experimental_rerun()
+            else:
+                st.write("Please refresh the page to continue.")
+                st.stop()
+
             return st.session_state["user_info"]
 
         except Exception as e:
