@@ -18,7 +18,7 @@ REDIRECT_URI = st.secrets["google"]["redirect_uri"]
 
 GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
 
-# Use the full scope URLs to match what Google returns.
+# Use full scope URLs to match what Google returns.
 SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",
@@ -45,7 +45,6 @@ def get_google_oauth_flow():
                 "redirect_uris": [
                     REDIRECT_URI  # Use the production redirect URI from secrets
                 ],
-                # For javascript origins, remove any trailing slash
                 "javascript_origins": [
                     REDIRECT_URI.rstrip("/")
                 ]
@@ -58,14 +57,15 @@ def get_google_oauth_flow():
 def sign_in_with_google():
     """
     Initiates the OAuth flow and returns user info after successful sign-in.
-
     This version automatically checks for the authorization code in the URL
-    query parameters (using st.experimental_get_query_params) so that the user
-    doesn't have to manually copy-paste it.
+    query parameters, so the user doesn't have to manually copy-paste it.
+    
+    After a successful sign-in, the user info is saved in session state and the
+    app is re-run to move into the main application.
     """
     flow = get_google_oauth_flow()
-
-    # Check if an authorization code is present in the URL
+    
+    # Check if an authorization code is present in the URL query parameters
     query_params = st.experimental_get_query_params()
     if "code" in query_params:
         auth_code = query_params["code"][0]
@@ -83,11 +83,16 @@ def sign_in_with_google():
             # Extract relevant profile information
             user_email = id_info.get("email")
             user_name = id_info.get("name", "")
+
             st.success(f"Signed in successfully as {user_name} ({user_email})!")
-            return {
-                "email": user_email,
-                "name": user_name,
-            }
+            # Save user info in session state
+            st.session_state["user_info"] = {"email": user_email, "name": user_name}
+
+            # Clear query parameters and re-run the app to trigger dashboard display
+            st.experimental_set_query_params()
+            st.experimental_rerun()
+
+            return st.session_state["user_info"]
         except Exception as e:
             st.error(f"An error occurred during sign-in: {e}")
             return None
@@ -97,7 +102,6 @@ def sign_in_with_google():
     st.write("Click the button below to authorize with Google:")
     if st.button("Sign in with Google"):
         st.markdown(f"[Authorize with Google]({auth_url})")
-
     st.write("After authorizing, you will be redirected back with an authorization code.")
 
     return None
