@@ -19,25 +19,31 @@ def get_connection():
 
 def run_query(query, params=None):
     """
-    Execute a SQL query (typically a SELECT) and return all rows.
+    Execute a SQL query. If it's a SELECT or includes a RETURNING clause,
+    return the resulting rows as a list of dictionaries.
+    Otherwise, perform the operation and return None.
 
     Args:
         query (str): The SQL query to run.
         params (tuple or dict, optional): Parameters to pass with the query.
 
     Returns:
-        list[dict]: List of rows as dictionaries.
+        list[dict] or None: Rows as dictionaries if applicable, else None.
     """
     conn = get_connection()
     try:
         with conn:
             with conn.cursor() as cur:
                 cur.execute(query, params)
-                # Return rows if the query is a SELECT
-                if query.strip().lower().startswith("select"):
-                    return cur.fetchall()
+                # Check if it's a SELECT or has a RETURNING clause.
+                # If so, fetch the results; otherwise, just commit.
+                lower_query = query.strip().lower()
+                if lower_query.startswith("select") or " returning " in lower_query:
+                    rows = cur.fetchall()  # fetch the returned rows
+                    return rows
                 else:
                     conn.commit()
+                    return None
     except Exception as e:
         st.error(f"Error executing query: {e}")
         raise
