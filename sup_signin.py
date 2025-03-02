@@ -45,28 +45,34 @@ def get_google_oauth_flow():
 def sign_in_with_google():
     """
     Initiates the OAuth flow and returns user info after successful sign-in.
-
+    
     Flow:
       1. If the user is already signed in (stored in session state), return that info.
       2. Check if the URL contains an authorization code (using st.query_params).
-         - If yes, also retrieve the state and set it on the Flow.
-         - Exchange the code for tokens, store the user info, then clear the query params and rerun.
+         - Process it only if it hasn't been consumed yet.
+         - Exchange the code for tokens, store the user info, then mark the code as consumed,
+           clear the query parameters, and rerun.
       3. If no code is present, display a sign-in button that sends the user to Google.
     """
-    # Return early if the user is already signed in.
+    # If already signed in, return the stored user info.
     if "user_info" in st.session_state:
         return st.session_state["user_info"]
 
     query_params = st.query_params
 
     if "code" in query_params:
+        # Check if we've already processed this code.
+        if st.session_state.get("code_consumed", False):
+            # The code was already processed—return the stored user info.
+            return st.session_state.get("user_info", None)
+
         auth_code = query_params["code"][0]
-        # Try to also get the state from the query parameters.
+        # Optionally retrieve the state from query parameters.
         state_param = query_params.get("state", [None])[0]
         try:
             # Reinitialize the Flow.
             flow = get_google_oauth_flow()
-            # Set the state on the Flow using the query value or the stored one.
+            # Set the state on the Flow using the query value or stored state.
             if state_param:
                 flow.state = state_param
             elif "state" in st.session_state:
@@ -87,11 +93,13 @@ def sign_in_with_google():
 
             st.session_state["user_info"] = {"email": user_email, "name": user_name}
             st.success(f"Signed in successfully as {user_name} ({user_email})!")
-
-            # Clear query parameters immediately to prevent reuse of the code.
-            st.experimental_set_query_params({})  # Pass an empty dict to clear.
+            
+            # Mark this code as consumed so we don't try to process it again.
+            st.session_state["code_consumed"] = True
+            
+            # Clear query parameters to prevent reusing the code.
+            st.experimental_set_query_params({})
             st.experimental_rerun()
-
             return st.session_state["user_info"]
 
         except Exception as e:
@@ -102,7 +110,7 @@ def sign_in_with_google():
         # No authorization code present; generate the auth URL.
         flow = get_google_oauth_flow()
         auth_url, state = flow.authorization_url(prompt="consent")
-        # Save the state so we can use it later.
+        # Save the state to session state so it can be reused later.
         st.session_state["state"] = state
 
         st.write("Click the button below to authorize with Google:")
