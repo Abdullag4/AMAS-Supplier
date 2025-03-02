@@ -7,11 +7,9 @@ import google.auth.transport.requests
 # ----------------------------------------------------------------------------
 # Configuration / Secrets
 # ----------------------------------------------------------------------------
-# Make sure your Streamlit secrets have the correct values.
 GOOGLE_CLIENT_ID = st.secrets["google"]["client_id"]
 GOOGLE_CLIENT_SECRET = st.secrets["google"]["client_secret"]
-# Updated redirect URI.
-REDIRECT_URI = st.secrets["google"]["redirect_uri"]  # "https://amas-supplier.streamlit.app/"
+REDIRECT_URI = st.secrets["google"]["redirect_uri"]
 
 # Use full scope URLs to match what Google returns.
 SCOPES = [
@@ -48,7 +46,7 @@ def get_google_oauth_flow():
 def sign_in_with_google():
     """
     Initiates the OAuth flow and returns user info after successful sign-in.
-
+    
     Flow:
       1. If the user is already signed in (stored in session state), return that info.
       2. Check if the URL contains an authorization code (using st.query_params).
@@ -56,14 +54,14 @@ def sign_in_with_google():
          - Mark the code as consumed, clear query parameters, and rerun the app.
       3. If no code is present, display a sign-in button that sends the user to Google.
     """
-    # Return early if user is already signed in.
+    # Return early if already signed in.
     if "user_info" in st.session_state:
         return st.session_state["user_info"]
 
     query_params = st.query_params
 
     if "code" in query_params:
-        # Prevent reprocessing if we've already consumed this code.
+        # Check if we've already processed this code.
         if st.session_state.get("code_consumed", False):
             return st.session_state.get("user_info", None)
 
@@ -94,10 +92,9 @@ def sign_in_with_google():
             st.success(f"Signed in successfully as {user_name} ({user_email})!")
             st.session_state["code_consumed"] = True
 
-            # Clear query parameters to avoid reusing the code.
-            st.experimental_set_query_params({})
+            # Clear query parameters by calling without arguments.
+            st.experimental_set_query_params()
             st.experimental_rerun()
-
             return st.session_state["user_info"]
 
         except Exception as e:
