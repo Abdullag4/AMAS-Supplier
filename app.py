@@ -1,19 +1,21 @@
 import streamlit as st
 from sup_signin import sign_in_with_google
+from supplier_db import get_or_create_supplier
 
 def main():
     st.title("AMAS Supplier App")
     
-    # Call the sign-in function.
-    # If the user is not signed in, this function will trigger the sign‑in flow.
+    # Trigger the Google sign-in flow.
     user_info = sign_in_with_google()
-    
-    # If user_info is still None (not signed in), halt further execution.
     if not user_info:
-        st.stop()
+        st.stop()  # Halt execution until sign-in is complete.
     
-    # Once the user is signed in, display the main dashboard.
-    st.write(f"Welcome, {user_info['name']}!")
+    # Retrieve (or create) the supplier record in your Neon database.
+    supplier = get_or_create_supplier(user_info["name"], user_info["email"])
+    
+    # Display a welcome message and supplier details.
+    st.write(f"Welcome, **{supplier['suppliername']}**!")
+    st.write(f"Your Supplier ID is: **{supplier['supplierid']}**")
     st.write("This is your supplier dashboard. [Add your app content here...]")
 
 if __name__ == "__main__":
