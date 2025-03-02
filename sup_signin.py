@@ -48,18 +48,18 @@ def sign_in_with_google():
     Initiates the OAuth flow and returns user info after successful sign-in.
     
     Flow:
-      1. If user info is already stored in session state, return it.
-      2. Check if the URL contains an authorization code (using st.experimental_get_query_params).
-         - If yes, reconstruct the full redirect URL and exchange it for tokens.
-         - Mark the code as consumed, clear the query parameters, and rerun the app.
+      1. If user info is already in session state, return it.
+      2. If the URL contains an authorization code (via st.query_params), reconstruct
+         the full redirect URL and exchange it for tokens. Mark the code as consumed,
+         clear the query parameters, and rerun the app.
       3. If no code is present, display a sign-in button that sends the user to Google.
     """
     # Return early if already signed in.
     if "user_info" in st.session_state:
         return st.session_state["user_info"]
 
-    # Read query parameters using the experimental API.
-    query_params = st.experimental_get_query_params()
+    # Read query parameters using the new API (st.query_params is a property)
+    query_params = st.query_params
     if "code" in query_params:
         # Prevent reprocessing if we've already used this code.
         if st.session_state.get("code_consumed", False):
@@ -92,8 +92,8 @@ def sign_in_with_google():
             st.success(f"Signed in successfully as {user_name} ({user_email})!")
             st.session_state["code_consumed"] = True
 
-            # Clear query parameters using experimental_set_query_params.
-            st.experimental_set_query_params({})
+            # Clear query parameters (clear by calling st.set_query_params with no arguments)
+            st.set_query_params()
             if hasattr(st, "experimental_rerun"):
                 st.experimental_rerun()
             else:
