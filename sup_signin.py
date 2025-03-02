@@ -18,8 +18,12 @@ REDIRECT_URI = st.secrets["google"]["redirect_uri"]
 
 GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
 
-# Scopes required for basic profile info (email, name, etc.)
-SCOPES = ["openid", "email", "profile"]
+# Use the full scope URLs to match what Google returns.
+SCOPES = [
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile"
+]
 
 # ----------------------------------------------------------------------------
 # Functions
