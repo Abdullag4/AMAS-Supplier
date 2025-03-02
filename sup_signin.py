@@ -46,20 +46,20 @@ def get_google_oauth_flow():
 def sign_in_with_google():
     """
     Initiates the OAuth flow and returns user info after successful sign-in.
-
+    
     Flow:
-      1. If the user is already signed in (stored in session state), return that info.
-      2. Check if the URL contains an authorization code (using st.experimental_get_query_params).
-         - If yes, reconstruct the full authorization response URL and exchange it for tokens.
-         - Mark the code as consumed, clear query parameters, and rerun the app.
+      1. If user info is already stored in session state, return it.
+      2. If the URL contains an authorization code (via st.query_params),
+         reconstruct the full redirect URL and exchange it for tokens.
+         Mark the code as consumed, clear the query parameters, and rerun.
       3. If no code is present, display a sign-in button that sends the user to Google.
     """
     # Return early if already signed in.
     if "user_info" in st.session_state:
         return st.session_state["user_info"]
 
-    # Read query parameters using the experimental API.
-    query_params = st.experimental_get_query_params()
+    # Read query parameters using the new API (property, not a function)
+    query_params = st.query_params
     if "code" in query_params:
         # Prevent reprocessing if we've already used this code.
         if st.session_state.get("code_consumed", False):
@@ -76,7 +76,7 @@ def sign_in_with_google():
             elif "state" in st.session_state:
                 flow.state = st.session_state["state"]
 
-            # Exchange the full URL for tokens.
+            # Exchange the full URL (with query parameters) for tokens.
             flow.fetch_token(authorization_response=authorization_response)
             credentials = flow.credentials
 
@@ -93,9 +93,8 @@ def sign_in_with_google():
             st.session_state["code_consumed"] = True
 
             # Clear query parameters using the new API.
-            st.query_params({})  # Clear by calling st.query_params as a setter.
-            
-            # Rerun the app if possible.
+            st.set_query_params({})
+            # Rerun the app if possible; otherwise, ask the user to refresh.
             if hasattr(st, "experimental_rerun"):
                 st.experimental_rerun()
             else:
