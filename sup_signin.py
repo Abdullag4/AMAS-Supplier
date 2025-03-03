@@ -3,10 +3,11 @@ import urllib.parse
 from google_auth_oauthlib.flow import Flow
 from google.oauth2 import id_token
 import google.auth.transport.requests
+from streamlit_js_eval import get_cookie, set_cookie
 
 GOOGLE_CLIENT_ID = st.secrets["google"]["client_id"]
 GOOGLE_CLIENT_SECRET = st.secrets["google"]["client_secret"]
-REDIRECT_URI = st.secrets["google"]["redirect_uri"]  # e.g., "https://amas-supplier.streamlit.app/"
+REDIRECT_URI = st.secrets["google"]["redirect_uri"]
 
 SCOPES = [
     "openid",
@@ -19,7 +20,7 @@ def get_google_oauth_flow():
         client_config={
             "web": {
                 "client_id": GOOGLE_CLIENT_ID,
-                "project_id": "YOUR_PROJECT_ID",  # Replace with your actual GCP project ID
+                "project_id": "YOUR_PROJECT_ID",
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://accounts.google.com/o/oauth2/token",
                 "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
@@ -34,24 +35,22 @@ def get_google_oauth_flow():
 
 def sign_in_with_google():
     """
-    A fallback sign-in approach that does NOT try to clear the code or rerun.
-
-    1. If 'user_info' is already in session, return it (already signed in).
-    2. Check if there's a 'code' in st.experimental_get_query_params() (we read it, but never remove it).
-       - If we've not used it yet ('code_consumed' != True), attempt the token exchange.
-       - On success, store user_info in session and set 'code_consumed = True'.
-         That way, if user manually refreshes, we won't re-use that code again.
-    3. If no code, show a "Sign in with Google" button.
+    1. If 'user_info' exists in cookies, use it (persistent login).
+    2. Otherwise, if 'code' is in URL, exchange it for a token and save user_info in a cookie.
+    3. If neither, show Google sign-in button.
     """
-    # Already signed in?
-    if "user_info" in st.session_state:
+    # 1️⃣ Check if user info exists in cookies (persistent login)
+    saved_email = get_cookie("user_email")
+    saved_name = get_cookie("user_name")
+    
+    if saved_email and saved_name:
+        st.session_state["user_info"] = {"email": saved_email, "name": saved_name}
         return st.session_state["user_info"]
 
-    # Parse code with the old "experimental" function (ignore the deprecation warning)
+    # 2️⃣ Parse Google OAuth response
     query_params = st.experimental_get_query_params()
     if "code" in query_params:
         if not st.session_state.get("code_consumed", False):
-            # Reconstruct the full authorization URL
             query_string = urllib.parse.urlencode(query_params, doseq=True)
             authorization_response = f"{REDIRECT_URI}?{query_string}"
 
@@ -62,7 +61,7 @@ def sign_in_with_google():
                 elif "state" in st.session_state:
                     flow.state = st.session_state["state"]
 
-                # Exchange code for tokens
+                # Exchange the authorization code for an access token
                 flow.fetch_token(authorization_response=authorization_response)
                 creds = flow.credentials
 
@@ -77,8 +76,11 @@ def sign_in_with_google():
                 if not user_name:
                     user_name = user_email.split("@")[0] or "Unnamed Supplier"
 
-                # Store
+                # 3️⃣ Store user info in session and cookies
                 st.session_state["user_info"] = {"email": user_email, "name": user_name}
+                set_cookie("user_email", user_email)
+                set_cookie("user_name", user_name)
+
                 st.session_state["code_consumed"] = True
                 st.success(f"Signed in successfully as {user_name} ({user_email})!")
 
@@ -86,17 +88,15 @@ def sign_in_with_google():
                 st.error(f"Sign-in error: {e}")
                 return None
 
-        # If code_consumed is already True, we do nothing; user_info might be set or might be None
         return st.session_state.get("user_info", None)
 
-    else:
-        # No code -> show sign-in button
-        flow = get_google_oauth_flow()
-        auth_url, state = flow.authorization_url(prompt="consent")
-        st.session_state["state"] = state
+    # 4️⃣ No session or cookie -> show Google sign-in button
+    flow = get_google_oauth_flow()
+    auth_url, state = flow.authorization_url(prompt="consent")
+    st.session_state["state"] = state
 
-        st.write("Click below to authorize with Google:")
-        if st.button("Sign in with Google"):
-            st.markdown(f"[Authorize with Google]({auth_url})")
+    st.write("Click below to authorize with Google:")
+    if st.button("Sign in with Google"):
+        st.markdown(f"[Authorize with Google]({auth_url})")
 
-        return None
+    return None
