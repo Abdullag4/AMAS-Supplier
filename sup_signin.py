@@ -6,7 +6,7 @@ import google.auth.transport.requests
 
 GOOGLE_CLIENT_ID = st.secrets["google"]["client_id"]
 GOOGLE_CLIENT_SECRET = st.secrets["google"]["client_secret"]
-REDIRECT_URI = st.secrets["google"]["redirect_uri"]  # e.g. "https://amas-supplier.streamlit.app/"
+REDIRECT_URI = st.secrets["google"]["redirect_uri"]  # e.g., "https://amas-supplier.streamlit.app/"
 
 SCOPES = [
     "openid",
@@ -34,65 +34,63 @@ def get_google_oauth_flow():
 
 def sign_in_with_google():
     """
-    Google Sign-In flow using old 'experimental' query parameter functions,
-    since your environment doesn't actually support the new st.set_query_params().
+    A fallback sign-in approach that does NOT try to clear the code or rerun.
+
+    1. If 'user_info' is already in session, return it (already signed in).
+    2. Check if there's a 'code' in st.experimental_get_query_params() (we read it, but never remove it).
+       - If we've not used it yet ('code_consumed' != True), attempt the token exchange.
+       - On success, store user_info in session and set 'code_consumed = True'.
+         That way, if user manually refreshes, we won't re-use that code again.
+    3. If no code, show a "Sign in with Google" button.
     """
-    # 1. Check if user already in session
+    # Already signed in?
     if "user_info" in st.session_state:
         return st.session_state["user_info"]
 
-    # 2. Read query params using the experimental function
+    # Parse code with the old "experimental" function (ignore the deprecation warning)
     query_params = st.experimental_get_query_params()
     if "code" in query_params:
-        # Prevent reusing the code
-        if st.session_state.get("code_consumed", False):
-            return st.session_state.get("user_info", None)
+        if not st.session_state.get("code_consumed", False):
+            # Reconstruct the full authorization URL
+            query_string = urllib.parse.urlencode(query_params, doseq=True)
+            authorization_response = f"{REDIRECT_URI}?{query_string}"
 
-        # Reconstruct the full redirect URL
-        query_string = urllib.parse.urlencode(query_params, doseq=True)
-        authorization_response = f"{REDIRECT_URI}?{query_string}"
+            try:
+                flow = get_google_oauth_flow()
+                if "state" in query_params:
+                    flow.state = query_params["state"][0]
+                elif "state" in st.session_state:
+                    flow.state = st.session_state["state"]
 
-        try:
-            flow = get_google_oauth_flow()
-            if "state" in query_params:
-                flow.state = query_params["state"][0]
-            elif "state" in st.session_state:
-                flow.state = st.session_state["state"]
+                # Exchange code for tokens
+                flow.fetch_token(authorization_response=authorization_response)
+                creds = flow.credentials
 
-            flow.fetch_token(authorization_response=authorization_response)
-            credentials = flow.credentials
+                # Verify the ID token
+                request_session = google.auth.transport.requests.Request()
+                id_info = id_token.verify_oauth2_token(
+                    creds.id_token, request_session, GOOGLE_CLIENT_ID
+                )
 
-            # Verify ID token
-            request_session = google.auth.transport.requests.Request()
-            id_info = id_token.verify_oauth2_token(
-                credentials.id_token, request_session, GOOGLE_CLIENT_ID
-            )
+                user_email = id_info.get("email", "")
+                user_name = id_info.get("name", "")
+                if not user_name:
+                    user_name = user_email.split("@")[0] or "Unnamed Supplier"
 
-            user_email = id_info.get("email", "")
-            user_name = id_info.get("name", "")
-            if not user_name:
-                user_name = user_email.split("@")[0] or "Unnamed Supplier"
+                # Store
+                st.session_state["user_info"] = {"email": user_email, "name": user_name}
+                st.session_state["code_consumed"] = True
+                st.success(f"Signed in successfully as {user_name} ({user_email})!")
 
-            st.session_state["user_info"] = {"email": user_email, "name": user_name}
-            st.session_state["code_consumed"] = True
-            st.success(f"Signed in successfully as {user_name} ({user_email})!")
+            except Exception as e:
+                st.error(f"Sign-in error: {e}")
+                return None
 
-            # Clear query parameters using experimental_set_query_params
-            st.experimental_set_query_params()
-            if hasattr(st, "experimental_rerun"):
-                st.experimental_rerun()
-            else:
-                st.warning("Please refresh manually to continue.")
-                st.stop()
-
-            return st.session_state["user_info"]
-
-        except Exception as e:
-            st.error(f"An error occurred during sign-in: {e}")
-            return None
+        # If code_consumed is already True, we do nothing; user_info might be set or might be None
+        return st.session_state.get("user_info", None)
 
     else:
-        # 3. No code present -> show button
+        # No code -> show sign-in button
         flow = get_google_oauth_flow()
         auth_url, state = flow.authorization_url(prompt="consent")
         st.session_state["state"] = state
