@@ -1,6 +1,6 @@
 import streamlit as st
 from sup_signin import sign_in_with_google
-from supplier_db import get_or_create_supplier, update_supplier
+from supplier_db import get_or_create_supplier, save_supplier_details, get_missing_fields, get_supplier_form_structure
 from home import show_home_page
 
 def main():
@@ -11,13 +11,14 @@ def main():
     if not user_info:
         st.stop()
 
-    # 2. Check if supplier exists, create if not
+    # 2. Get supplier record
     supplier = get_or_create_supplier(user_info["name"], user_info["email"])
 
-    # 3. Check if the supplier is missing important data
-    if supplier_needs_update(supplier):
-        show_supplier_registration_form(supplier)
-        st.stop()  # Prevent access to dashboard until form is completed
+    # 3. Check if supplier needs to complete registration
+    missing_fields = get_missing_fields(supplier)
+    if missing_fields:
+        show_supplier_registration_form(supplier, missing_fields)
+        st.stop()
 
     # 4. Sidebar Navigation
     st.sidebar.title("Navigation")
@@ -29,46 +30,28 @@ def main():
     else:
         show_supplier_dashboard(supplier)
 
-def supplier_needs_update(supplier):
-    """
-    Check if the supplier has missing required fields.
-    Example: If supplier type, country, and contact phone are empty, return True.
-    """
-    required_fields = ["suppliertype", "country", "contactphone"]
-    return any(not supplier[field] for field in required_fields)
-
-def show_supplier_registration_form(supplier):
+def show_supplier_registration_form(supplier, missing_fields):
     """Displays a form for new suppliers to complete their registration."""
     st.warning("Please complete your supplier profile before continuing.")
-    
+
+    # Get form structure from supplier_db.py
+    form_structure = get_supplier_form_structure()
+
     # Form inputs
-    supplier_type = st.selectbox("Supplier Type", ["Manufacturer", "Distributor", "Retailer", "Other"])
-    country = st.text_input("Country", supplier.get("country", ""))
-    city = st.text_input("City", supplier.get("city", ""))
-    address = st.text_input("Address", supplier.get("address", ""))
-    postal_code = st.text_input("Postal Code", supplier.get("postalcode", ""))
-    contact_name = st.text_input("Contact Name", supplier.get("contactname", ""))
-    contact_phone = st.text_input("Contact Phone", supplier.get("contactphone", ""))
-    payment_terms = st.text_area("Payment Terms", supplier.get("paymentterms", ""))
-    bank_details = st.text_area("Bank Details", supplier.get("bankdetails", ""))
+    form_data = {}
+    for field, label in missing_fields.items():
+        field_type = form_structure[field]["type"]
+        if field_type == "text":
+            form_data[field] = st.text_input(label, supplier.get(field, ""))
+        elif field_type == "select":
+            form_data[field] = st.selectbox(label, form_structure[field]["options"])
+        elif field_type == "textarea":
+            form_data[field] = st.text_area(label, supplier.get(field, ""))
 
     if st.button("Submit"):
-        updated_data = {
-            "suppliertype": supplier_type,
-            "country": country,
-            "city": city,
-            "address": address,
-            "postalcode": postal_code,
-            "contactname": contact_name,
-            "contactphone": contact_phone,
-            "paymentterms": payment_terms,
-            "bankdetails": bank_details,
-        }
-
-        # Update supplier details in DB
-        update_supplier(supplier["supplierid"], updated_data)
+        save_supplier_details(supplier["supplierid"], form_data)
         st.success("Profile updated successfully! Please continue to the dashboard.")
-        st.experimental_rerun()  # Refresh the page to show the dashboard
+        st.experimental_rerun()  # Refresh the page
 
 def show_supplier_dashboard(supplier):
     """Displays the supplier dashboard."""
