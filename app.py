@@ -17,7 +17,7 @@ def main():
         st.stop()
 
     # 2. Get supplier record
-    supplier = get_or_create_supplier(user_info["name"], user_info["email"])
+    supplier = get_or_create_supplier(user_info["email"])  # 🔥 Removed name from here
 
     # 3. Check if supplier needs to complete registration
     missing_fields = get_missing_fields(supplier)
@@ -45,8 +45,14 @@ def show_supplier_registration_form(supplier, missing_fields):
     # Initialize form_data with existing values
     form_data = {field: supplier.get(field, "") for field in form_structure.keys()}
 
+    # 🔹 Ask the user to enter their supplier name manually
+    form_data["suppliername"] = st.text_input("Supplier Name", supplier.get("suppliername", ""))
+
     # Display inputs only for missing fields
     for field in missing_fields:
+        if field == "suppliername":  # 🔥 Ensure "suppliername" is always displayed
+            continue
+        
         field_config = form_structure[field]
         label = field_config["label"]
         field_type = field_config["type"]
@@ -59,19 +65,19 @@ def show_supplier_registration_form(supplier, missing_fields):
             form_data[field] = st.text_area(label, form_data[field])
 
     if st.button("Submit"):
-        save_supplier_details(supplier["supplierid"], form_data)
+        save_supplier_details(supplier["supplierid"], form_data)  # 🔥 Saves manually entered name too
         st.success("Profile updated successfully! Redirecting to the dashboard...")
-        st.rerun()  # 🔥 Fix: Replaces `st.experimental_rerun()`
+        st.rerun()
 
 def show_supplier_dashboard(supplier):
     """Displays the supplier dashboard."""
-    st.write(f"Welcome, **{supplier['suppliername']}**!")
+    st.write(f"Welcome, **{supplier['suppliername']}**!")  # 🔥 Uses manually entered name
     st.write(f"Your Supplier ID is: **{supplier['supplierid']}**")
 
     # Logout button
     if st.button("Log out"):
         st.logout()
-        st.rerun()  # 🔥 Fix: Replaces `st.experimental_rerun()`
+        st.rerun()
 
 if __name__ == "__main__":
     main()
