@@ -1,25 +1,28 @@
 import streamlit as st
+from sup_signin import sign_in_with_google
+# Example DB function if you want to store the user
+from supplier_db import get_or_create_supplier
 
 def main():
     st.title("AMAS Supplier App (OIDC)")
 
-    # 1. Check if user is logged in
-    if not st.experimental_user.is_logged_in:
-        # 2. Show a login button for Google
-        st.write("You are not logged in.")
-        if st.button("Log in with Google"):
-            # This calls the OIDC login flow using the config in [auth] in secrets.toml
-            st.login()
-        st.stop()  # Stop execution until user is logged in
+    # 1. Attempt to sign in with Google
+    user_info = sign_in_with_google()  # This blocks until the user is logged in
 
-    # 3. If we reach here, user is logged in. Show a logout button.
+    # 2. If you have a DB function, retrieve or create the supplier record
+    supplier = get_or_create_supplier(user_info["name"], user_info["email"])
+    if not supplier:
+        st.error("Could not retrieve or create supplier record.")
+        st.stop()
+
+    # 3. Display a welcome message
+    st.write(f"Welcome, **{supplier['suppliername']}**!")
+    st.write(f"Your Supplier ID is: **{supplier['supplierid']}**")
+
+    # 4. Logout button
     if st.button("Log out"):
-        st.logout()
-
-    # 4. Display some user info
-    st.markdown(f"**Welcome** {st.experimental_user.name or ''}!")
-    st.markdown(f"**Email**: {st.experimental_user.email or ''}")
-    st.markdown("Here is your supplier dashboard...")
+        st.logout()  # Removes the identity cookie
+        st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
