@@ -5,14 +5,14 @@ from streamlit_google_auth import Authenticate
 
 def create_temp_google_credentials():
     """
-    Reads Google OAuth credentials from Streamlit secrets and writes to a temporary JSON file.
+    Reads Google OAuth credentials from Streamlit secrets and writes them to a temporary JSON file.
     Returns the file path.
     """
-    creds_json_str = st.secrets["google_oauth"]["json"]  # Get JSON from secrets
-    creds_dict = json.loads(creds_json_str)  # Convert JSON string to a Python dictionary
+    creds_json_str = st.secrets["google_oauth"]["json"]  # Get JSON string from secrets
+    creds_dict = json.loads(creds_json_str)  # Convert JSON string to a dictionary
 
-    # Write credentials to a temp file
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as temp_file:
+    # Write credentials to a temp file in text mode (`w` instead of `wb`)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".json", mode="w", encoding="utf-8") as temp_file:
         json.dump(creds_dict, temp_file)  # Save JSON content
         temp_file.flush()  # Ensure data is written before passing the path
         return temp_file.name  # Return the temporary file path
