@@ -1,6 +1,6 @@
 from db_handler import run_query
 
-# List of required fields with their human-readable labels
+# List of required fields with their labels
 SUPPLIER_FIELDS = {
     "suppliertype": "Supplier Type",
     "country": "Country",
@@ -40,16 +40,17 @@ def get_missing_fields(supplier):
     Identify missing required fields for a supplier.
     Returns a list of missing fields with labels.
     """
-    missing_fields = {
-        key: label for key, label in SUPPLIER_FIELDS.items() if not supplier.get(key)
-    }
+    missing_fields = [
+        key for key, label in SUPPLIER_FIELDS.items()
+        if not supplier.get(key) or supplier[key] == ""
+    ]
     return missing_fields
 
 def get_supplier_form_structure():
     """
     Returns a structured dictionary defining the supplier form.
     - Defines the labels for each field.
-    - Defines input types (text, select, etc.) for modularity.
+    - Defines input types (text, select, etc.).
     """
     return {
         "suppliertype": {"label": "Supplier Type", "type": "select", "options": ["Manufacturer", "Distributor", "Retailer", "Other"]},
@@ -80,15 +81,15 @@ def save_supplier_details(supplierid, form_data):
     WHERE supplierid = %s
     """
     params = (
-        form_data["suppliertype"],
-        form_data["country"],
-        form_data["city"],
-        form_data["address"],
-        form_data["postalcode"],
-        form_data["contactname"],
-        form_data["contactphone"],
-        form_data["paymentterms"],
-        form_data["bankdetails"],
+        form_data.get("suppliertype", ""),
+        form_data.get("country", ""),
+        form_data.get("city", ""),
+        form_data.get("address", ""),
+        form_data.get("postalcode", ""),
+        form_data.get("contactname", ""),
+        form_data.get("contactphone", ""),
+        form_data.get("paymentterms", ""),
+        form_data.get("bankdetails", ""),
         supplierid,
     )
     run_query(query, params)
