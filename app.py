@@ -1,33 +1,25 @@
 import streamlit as st
-from sup_signin import sign_in_with_google
-from supplier_db import get_or_create_supplier
-from streamlit_google_auth import Authenticate
 
 def main():
-    st.title("AMAS Supplier App")
+    st.title("AMAS Supplier App (OIDC)")
 
-    user_info = sign_in_with_google()
-    if not user_info:
-        st.stop()
+    # 1. Check if user is logged in
+    if not st.experimental_user.is_logged_in:
+        # 2. Show a login button for Google
+        st.write("You are not logged in.")
+        if st.button("Log in with Google"):
+            # This calls the OIDC login flow using the config in [auth] in secrets.toml
+            st.login()
+        st.stop()  # Stop execution until user is logged in
 
-    supplier = get_or_create_supplier(user_info["name"], user_info["email"])
-    if not supplier:
-        st.error("Could not retrieve or create a supplier record.")
-        st.stop()
-
-    st.write(f"Welcome, **{supplier['suppliername']}**!")
-    st.write(f"Your Supplier ID is: **{supplier['supplierid']}**")
-
-    # Logout button
+    # 3. If we reach here, user is logged in. Show a logout button.
     if st.button("Log out"):
-        authenticator = Authenticate(
-            secret_credentials_path="",  # Not needed for logout
-            cookie_name="supplier_auth",
-            cookie_key="this_is_secret_key",
-            redirect_uri="https://amas-supplier.streamlit.app/",
-        )
-        authenticator.logout()
-        st.experimental_rerun()
+        st.logout()
+
+    # 4. Display some user info
+    st.markdown(f"**Welcome** {st.experimental_user.name or ''}!")
+    st.markdown(f"**Email**: {st.experimental_user.email or ''}")
+    st.markdown("Here is your supplier dashboard...")
 
 if __name__ == "__main__":
     main()
