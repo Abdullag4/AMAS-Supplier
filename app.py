@@ -18,13 +18,13 @@ def main():
     st.write(f"Welcome, **{supplier['suppliername']}**!")
     st.write(f"Your Supplier ID is: **{supplier['supplierid']}**")
 
-    # Logout
+    # Logout button
     if st.button("Log out"):
         authenticator = Authenticate(
-            secret_credentials_path="",  # We'll dynamically create a temp path but not used for logout
+            secret_credentials_path="",  # Not needed for logout
             cookie_name="supplier_auth",
-            cookie_key="some_random_secret_key",
-            redirect_uri="https://amas-supplier.streamlit.app",
+            cookie_key="this_is_secret_key",
+            redirect_uri="https://amas-supplier.streamlit.app/",
         )
         authenticator.logout()
         st.experimental_rerun()
