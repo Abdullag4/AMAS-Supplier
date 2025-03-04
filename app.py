@@ -61,7 +61,7 @@ def show_supplier_registration_form(supplier, missing_fields):
     if st.button("Submit"):
         save_supplier_details(supplier["supplierid"], form_data)
         st.success("Profile updated successfully! Redirecting to the dashboard...")
-        st.experimental_rerun()
+        st.rerun()  # 🔥 Fix: Replaces `st.experimental_rerun()`
 
 def show_supplier_dashboard(supplier):
     """Displays the supplier dashboard."""
@@ -71,7 +71,7 @@ def show_supplier_dashboard(supplier):
     # Logout button
     if st.button("Log out"):
         st.logout()
-        st.experimental_rerun()
+        st.rerun()  # 🔥 Fix: Replaces `st.experimental_rerun()`
 
 if __name__ == "__main__":
     main()
