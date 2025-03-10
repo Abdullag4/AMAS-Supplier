@@ -29,7 +29,7 @@ def get_purchase_order_items(poid):
     Retrieves all items associated with a purchase order.
     """
     query = """
-    SELECT ItemID, QuantityOrdered, EstimatedPrice
+    SELECT ItemID, Quantity, EstimatedPrice
     FROM PurchaseOrderItems
     WHERE POID = %s;
     """
