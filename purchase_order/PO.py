@@ -1,5 +1,5 @@
 import streamlit as st
-from supplier_db import get_purchase_orders_for_supplier, update_purchase_order_status, get_purchase_order_items
+from purchase_order.PO_db import get_purchase_orders_for_supplier, update_purchase_order_status, get_purchase_order_items
 
 def show_purchase_orders_page(supplier):
     """Displays purchase orders assigned to the supplier."""
