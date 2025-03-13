@@ -26,11 +26,17 @@ def update_purchase_order_status(poid, status, expected_delivery=None):
 
 def get_purchase_order_items(poid):
     """
-    Retrieves all items associated with a purchase order.
+    Retrieves all items associated with a purchase order, including the item name and picture.
     """
     query = """
-    SELECT ItemID, OrderedQuantity, EstimatedPrice
-    FROM PurchaseOrderItems
-    WHERE POID = %s;
+    SELECT 
+        i.ItemID, 
+        i.ItemNameEnglish, 
+        i.ItemPicture, 
+        poi.OrderedQuantity, 
+        poi.EstimatedPrice
+    FROM PurchaseOrderItems poi
+    JOIN Item i ON poi.ItemID = i.ItemID  -- 🔥 Join with Item table
+    WHERE poi.POID = %s;
     """
     return run_query(query, (poid,))
