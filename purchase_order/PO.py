@@ -1,5 +1,5 @@
 import streamlit as st
-from purchase_order.PO_db import get_purchase_orders_for_supplier, update_purchase_order_status, get_purchase_order_items
+from purchase_order.PO_db import get_purchase_order_items, get_purchase_orders_for_supplier, update_purchase_order_status
 
 def show_purchase_orders_page(supplier):
     """Displays purchase orders assigned to the supplier."""
@@ -23,8 +23,22 @@ def show_purchase_orders_page(supplier):
             items = get_purchase_order_items(po["poid"])
             if items:
                 st.subheader("Ordered Items")
+                
                 for item in items:
-                    st.write(f"- Item ID: {item['itemid']} | Quantity: {item['orderedquantity']} | Estimated Price: {item['estimatedprice'] or 'N/A'}")
+                    col1, col2 = st.columns([1, 3])  # 🔥 Layout: Image (1) + Details (3)
+                    
+                    # Display the item image (if available)
+                    with col1:
+                        if item["itempicture"]:  
+                            st.image(item["itempicture"], width=100, caption=item["itemnameenglish"])  
+                        else:
+                            st.write("No Image")
+
+                    # Display item details
+                    with col2:
+                        st.write(f"**{item['itemnameenglish']}**")
+                        st.write(f"**Ordered Quantity:** {item['orderedquantity']}")
+                        st.write(f"**Estimated Price:** {item['estimatedprice'] or 'N/A'}")
 
             # Supplier Actions
             if po["status"] == "Pending":
