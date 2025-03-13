@@ -1,4 +1,6 @@
 import streamlit as st
+import io
+from PIL import Image
 from purchase_order.PO_db import get_purchase_order_items, get_purchase_orders_for_supplier, update_purchase_order_status
 
 def show_purchase_orders_page(supplier):
@@ -30,7 +32,12 @@ def show_purchase_orders_page(supplier):
                     # Display the item image (if available)
                     with col1:
                         if item["itempicture"]:  
-                            st.image(item["itempicture"], width=100, caption=item["itemnameenglish"])  
+                            try:
+                                # Convert binary data to an image
+                                image = Image.open(io.BytesIO(item["itempicture"]))
+                                st.image(image, width=100, caption=item["itemnameenglish"])
+                            except Exception as e:
+                                st.warning("Error displaying image.")
                         else:
                             st.write("No Image")
 
