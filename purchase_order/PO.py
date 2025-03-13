@@ -24,7 +24,7 @@ def show_purchase_orders_page(supplier):
             if items:
                 st.subheader("Ordered Items")
                 for item in items:
-                    st.write(f"- Item ID: {item['itemid']} | Quantity: {item['quantity']} | Estimated Price: {item['estimatedprice'] or 'N/A'}")
+                    st.write(f"- Item ID: {item['itemid']} | Quantity: {item['orderedquantity']} | Estimated Price: {item['estimatedprice'] or 'N/A'}")
 
             # Supplier Actions
             if po["status"] == "Pending":
