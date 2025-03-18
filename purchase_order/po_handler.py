@@ -76,7 +76,7 @@ def get_purchase_order_items(poid):
     """
     results = run_query(query, (poid,))
 
-    # Convert images to "data:image/png;base64,..." format for Streamlit
+    # Convert images to "data:image/jpg;base64,..." format for Streamlit
     for item in results:
         # If not empty, add the prefix for direct <img src="...">
         if item["itempicture"]:
