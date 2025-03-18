@@ -40,3 +40,16 @@ def get_purchase_order_items(poid):
     WHERE poi.POID = %s;
     """
     return run_query(query, (poid,))
+
+def get_archived_purchase_orders(supplier_id):
+    """
+    Retrieves archived purchase orders for a specific supplier (Declined & Delivered).
+    """
+    query = """
+    SELECT POID, OrderDate, ExpectedDelivery, Status
+    FROM PurchaseOrders
+    WHERE SupplierID = %s AND Status IN ('Declined', 'Delivered')
+    ORDER BY OrderDate DESC;
+    """
+    return run_query(query, (supplier_id,))
+
