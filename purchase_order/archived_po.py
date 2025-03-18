@@ -1,7 +1,7 @@
 import streamlit as st
 import io
 from PIL import Image
-from purchase_order.PO_db import get_archived_purchase_orders, get_purchase_order_items
+from purchase_order.po_handler import get_archived_purchase_orders, get_purchase_order_items
 
 def show_archived_po_page(supplier):
     """Displays archived (Declined or Completed) purchase orders."""
