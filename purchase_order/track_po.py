@@ -1,7 +1,8 @@
 import streamlit as st
 import io
 from PIL import Image
-from purchase_order.PO_db import get_purchase_order_items, get_purchase_orders_for_supplier, update_purchase_order_status
+from purchase_order.po_handler import get_purchase_orders_for_supplier, update_purchase_order_status, get_purchase_order_items
+
 
 def show_purchase_orders_page(supplier):
     """Displays active purchase orders for the supplier."""
