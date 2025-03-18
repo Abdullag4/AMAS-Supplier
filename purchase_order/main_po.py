@@ -2,7 +2,7 @@ import streamlit as st
 from purchase_order.PO import show_track_po_page
 from purchase_order.archived_po import show_archived_po_page
 
-def show_purchase_orders_page(supplier):
+def show_main_po_page(supplier):
     """Manages the Purchase Order tabs."""
     st.title("Purchase Orders")
 
