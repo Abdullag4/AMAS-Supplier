@@ -1,4 +1,6 @@
 import streamlit as st
+import io
+from PIL import Image
 import pandas as pd
 from purchase_order.po_handler import (
     get_purchase_orders_for_supplier, 
@@ -7,11 +9,14 @@ from purchase_order.po_handler import (
 )
 
 def show_purchase_orders_page(supplier):
+    """Displays active purchase orders for the supplier in an HTML table with images."""
     st.subheader("📦 Track Purchase Orders")
 
+    # For controlling the 'decline reason' flow
     if "decline_po_show_reason" not in st.session_state:
         st.session_state["decline_po_show_reason"] = {}
 
+    # Fetch active POs
     purchase_orders = get_purchase_orders_for_supplier(supplier["supplierid"])
     if not purchase_orders:
         st.info("No active purchase orders.")
@@ -23,13 +28,15 @@ def show_purchase_orders_page(supplier):
             st.write(f"**Expected Delivery:** {po['expecteddelivery'] or 'Not Set'}")
             st.write(f"**Status:** {po['status']}")
 
+            # Show items in a table with images in columns
             items = get_purchase_order_items(po["poid"])
             if items:
-                st.subheader("Ordered Items (with Images)")
+                st.subheader("Ordered Items (with Images in Table)")
 
                 rows = []
                 for item in items:
                     if item["itempicture"]:
+                        # The final data URI is in item["itempicture"]
                         img_html = f'<img src="{item["itempicture"]}" width="80" />'
                     else:
                         img_html = "No Image"
@@ -42,9 +49,10 @@ def show_purchase_orders_page(supplier):
                     })
 
                 df = pd.DataFrame(rows, columns=["Picture", "Item Name", "Ordered Qty", "Estimated Price"])
-                df_html = df.to_html(escape=False, index=False)
+                df_html = df.to_html(escape=False, index=False)  # escape=False => render <img> tags
                 st.markdown(df_html, unsafe_allow_html=True)
 
+            # Supplier Actions
             if po["status"] == "Pending":
                 st.subheader("Respond to Order")
                 col1, col2 = st.columns(2)
@@ -64,12 +72,15 @@ def show_purchase_orders_page(supplier):
                             st.success("Order Accepted!")
                             st.rerun()
 
+                # Decline with reason
                 with col2:
+                    # If we haven't clicked "Decline" yet, show button
                     if not st.session_state["decline_po_show_reason"].get(po["poid"], False):
                         if st.button("Decline Order", key=f"decline_{po['poid']}"):
                             st.session_state["decline_po_show_reason"][po["poid"]] = True
                             st.rerun()
                     else:
+                        # Show text area for reason
                         st.write("**Reason for Declination**")
                         decline_note = st.text_area("Please provide a reason:", key=f"note_{po['poid']}")
 
