@@ -1,24 +1,19 @@
 import streamlit as st
-import io
-from PIL import Image
-from purchase_order.PO_db import get_purchase_order_items, get_purchase_orders_for_supplier, update_purchase_order_status
+from purchase_order.PO_db import get_active_purchase_orders, get_purchase_order_items, update_purchase_order_status
 
-def show_purchase_orders_page(supplier):
-    """Displays active purchase orders for the supplier."""
-    st.subheader("📦 Track Purchase Orders")
+def show_track_po_page(supplier):
+    """Displays only active purchase orders assigned to the supplier."""
+    st.subheader("📦 Active Purchase Orders")
 
-    # Fetch active purchase orders (excluding archived ones)
-    purchase_orders = get_purchase_orders_for_supplier(supplier["supplierid"])
+    # Fetch purchase orders for this supplier
+    purchase_orders = get_active_purchase_orders(supplier["supplierid"])
 
     if not purchase_orders:
-        st.info("No active purchase orders.")
+        st.info("No active purchase orders available.")
         return
 
-    # Display purchase orders
+    # Display purchase orders in a table
     for po in purchase_orders:
-        if po["status"] in ["Declined", "Delivered"]:
-            continue  # 🚀 Skip archived orders
-
         with st.expander(f"PO ID: {po['poid']} | Status: {po['status']}"):
             st.write(f"**Order Date:** {po['orderdate']}")
             st.write(f"**Expected Delivery:** {po['expecteddelivery'] if po['expecteddelivery'] else 'Not Set'}")
@@ -30,21 +25,13 @@ def show_purchase_orders_page(supplier):
                 st.subheader("Ordered Items")
                 for item in items:
                     col1, col2 = st.columns([1, 3])
-
                     with col1:
-                        if item["itempicture"]:  
-                            try:
-                                image = Image.open(io.BytesIO(item["itempicture"]))
-                                st.image(image, width=100, caption=item["itemnameenglish"])
-                            except Exception:
-                                st.warning("Error displaying image.")
+                        if item["itempicture"]:
+                            st.image(item["itempicture"], width=100, caption=item["itemnameenglish"])
                         else:
                             st.write("No Image")
-
                     with col2:
-                        st.write(f"**{item['itemnameenglish']}**")
-                        st.write(f"**Ordered Quantity:** {item['orderedquantity']}")
-                        st.write(f"**Estimated Price:** {item['estimatedprice'] or 'N/A'}")
+                        st.write(f"- **{item['itemnameenglish']}** | Ordered: {item['orderedquantity']} | Estimated Price: {item['estimatedprice'] or 'N/A'}")
 
             # Supplier Actions
             if po["status"] == "Pending":
