@@ -1,5 +1,7 @@
+import base64
 import imghdr
 from db_handler import run_query, run_transaction
+
 
 def get_purchase_orders_for_supplier(supplier_id):
     query = """
