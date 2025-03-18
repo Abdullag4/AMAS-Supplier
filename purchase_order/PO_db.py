@@ -15,12 +15,12 @@ def get_purchase_orders_for_supplier(supplier_id):
 
 def get_archived_purchase_orders(supplier_id):
     """
-    Retrieves ONLY archived purchase orders (Delivered, Declined).
+    Retrieves archived purchase orders (Declined, Delivered, Completed).
     """
     query = """
     SELECT POID, OrderDate, ExpectedDelivery, Status
     FROM PurchaseOrders
-    WHERE SupplierID = %s AND Status IN ('Declined', 'Delivered')
+    WHERE SupplierID = %s AND Status IN ('Declined', 'Delivered', 'Completed')
     ORDER BY OrderDate DESC;
     """
     return run_query(query, (supplier_id,))
