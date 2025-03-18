@@ -4,18 +4,21 @@ from PIL import Image
 from purchase_order.PO_db import get_purchase_order_items, get_purchase_orders_for_supplier, update_purchase_order_status
 
 def show_purchase_orders_page(supplier):
-    """Displays purchase orders assigned to the supplier."""
-    st.title("Purchase Orders")
+    """Displays active purchase orders for the supplier."""
+    st.subheader("📦 Track Purchase Orders")
 
-    # Fetch purchase orders for this supplier
+    # Fetch active purchase orders (excluding archived ones)
     purchase_orders = get_purchase_orders_for_supplier(supplier["supplierid"])
 
     if not purchase_orders:
-        st.info("No purchase orders available.")
+        st.info("No active purchase orders.")
         return
 
-    # Display purchase orders in a table
+    # Display purchase orders
     for po in purchase_orders:
+        if po["status"] in ["Declined", "Delivered"]:
+            continue  # 🚀 Skip archived orders
+
         with st.expander(f"PO ID: {po['poid']} | Status: {po['status']}"):
             st.write(f"**Order Date:** {po['orderdate']}")
             st.write(f"**Expected Delivery:** {po['expecteddelivery'] if po['expecteddelivery'] else 'Not Set'}")
@@ -25,23 +28,19 @@ def show_purchase_orders_page(supplier):
             items = get_purchase_order_items(po["poid"])
             if items:
                 st.subheader("Ordered Items")
-                
                 for item in items:
-                    col1, col2 = st.columns([1, 3])  # 🔥 Layout: Image (1) + Details (3)
-                    
-                    # Display the item image (if available)
+                    col1, col2 = st.columns([1, 3])
+
                     with col1:
                         if item["itempicture"]:  
                             try:
-                                # Convert binary data to an image
                                 image = Image.open(io.BytesIO(item["itempicture"]))
                                 st.image(image, width=100, caption=item["itemnameenglish"])
-                            except Exception as e:
+                            except Exception:
                                 st.warning("Error displaying image.")
                         else:
                             st.write("No Image")
 
-                    # Display item details
                     with col2:
                         st.write(f"**{item['itemnameenglish']}**")
                         st.write(f"**Ordered Quantity:** {item['orderedquantity']}")
