@@ -9,18 +9,18 @@ from purchase_order.po_handler import (
 )
 
 def show_purchase_orders_page(supplier):
-    """Displays active purchase orders for the supplier (in a table format)."""
+    """Displays active purchase orders for the supplier in an HTML table with images."""
     st.subheader("📦 Track Purchase Orders")
 
-    # Fetch active purchase orders (Pending, Accepted, Shipping)
+    # For controlling the 'decline reason' flow
+    if "decline_po_show_reason" not in st.session_state:
+        st.session_state["decline_po_show_reason"] = {}
+
+    # Fetch active POs
     purchase_orders = get_purchase_orders_for_supplier(supplier["supplierid"])
     if not purchase_orders:
         st.info("No active purchase orders.")
         return
-
-    # Dictionary to handle the decline reason expansions
-    if "decline_po_show_reason" not in st.session_state:
-        st.session_state["decline_po_show_reason"] = {}
 
     for po in purchase_orders:
         with st.expander(f"PO ID: {po['poid']} | Status: {po['status']}"):
@@ -28,64 +28,64 @@ def show_purchase_orders_page(supplier):
             st.write(f"**Expected Delivery:** {po['expecteddelivery'] or 'Not Set'}")
             st.write(f"**Status:** {po['status']}")
 
-            # Retrieve items for this order
+            # Show items in an HTML table
             items = get_purchase_order_items(po["poid"])
             if items:
-                st.subheader("Ordered Items")
-                
-                # 1) Build a DataFrame for a table of items (ID, Name, Qty, Price).
-                data_for_df = []
+                st.subheader("Ordered Items (with Images in Table)")
+
+                # Build a list of dict rows for DataFrame
+                rows = []
                 for item in items:
-                    data_for_df.append({
-                        "Item ID": item["itemid"],
+                    # item["itempicture"] is base64 string (like "data:image/png;base64,ABCD...")
+
+                    # If no image -> "No Image"; else create HTML <img> tag
+                    if item["itempicture"]:
+                        # strip "data:image/png;base64," if present
+                        base64_str = item["itempicture"].replace("data:image/png;base64,", "")
+                        img_html = f'<img src="data:image/png;base64,{base64_str}" width="80"/>'
+                    else:
+                        img_html = "No Image"
+
+                    rows.append({
+                        "Picture": img_html,
                         "Item Name": item["itemnameenglish"],
                         "Ordered Qty": item["orderedquantity"],
                         "Estimated Price": item["estimatedprice"] or "N/A"
                     })
-                df = pd.DataFrame(data_for_df)
-                st.table(df)  # or st.dataframe(df)
 
-                # 2) Optionally show images below the table.
-                st.subheader("Images")
-                for item in items:
-                    if item["itempicture"]:
-                        try:
-                            image = Image.open(io.BytesIO(item["itempicture"]))
-                            st.image(image, width=100, caption=item["itemnameenglish"])
-                        except Exception:
-                            st.warning(f"Error displaying image for item ID {item['itemid']}")
-                    else:
-                        st.write(f"No image for item ID {item['itemid']}")
+                # Create DF
+                df = pd.DataFrame(rows, columns=["Picture", "Item Name", "Ordered Qty", "Estimated Price"])
+                
+                # Convert DF to HTML with escape=False so images are displayed
+                df_html = df.to_html(escape=False, index=False)
+                st.markdown(df_html, unsafe_allow_html=True)
 
             # Supplier Actions
             if po["status"] == "Pending":
                 st.subheader("Respond to Order")
                 col1, col2 = st.columns(2)
 
-                # Accept
                 with col1:
                     if st.button("Accept Order", key=f"accept_{po['poid']}"):
-                        expected_delivery = st.date_input(
-                            f"Expected Delivery Date (PO {po['poid']})",
-                            key=f"date_{po['poid']}"
-                        )
+                        expected_delivery = st.date_input(f"Expected Delivery Date (PO {po['poid']})", key=f"date_{po['poid']}")
                         if expected_delivery:
                             update_purchase_order_status(
-                                poid=po["poid"],
-                                status="Accepted",
+                                poid=po["poid"], 
+                                status="Accepted", 
                                 expected_delivery=expected_delivery
                             )
                             st.success("Order Accepted!")
                             st.rerun()
 
-                # Decline (with reason)
+                # Decline with reason
                 with col2:
+                    # If we haven't clicked "Decline" yet, show button
                     if not st.session_state["decline_po_show_reason"].get(po["poid"], False):
-                        # Show "Decline Order" button
                         if st.button("Decline Order", key=f"decline_{po['poid']}"):
                             st.session_state["decline_po_show_reason"][po["poid"]] = True
                             st.rerun()
                     else:
+                        # Show text area for reason
                         st.write("**Reason for Declination**")
                         decline_note = st.text_area("Please provide a reason:", key=f"note_{po['poid']}")
 
@@ -93,7 +93,7 @@ def show_purchase_orders_page(supplier):
                         with confirm_col:
                             if st.button("Confirm Decline", key=f"confirm_decline_{po['poid']}"):
                                 update_purchase_order_status(
-                                    poid=po["poid"],
+                                    poid=po["poid"], 
                                     status="Declined",
                                     supplier_note=decline_note
                                 )
