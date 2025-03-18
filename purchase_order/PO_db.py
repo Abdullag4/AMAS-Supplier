@@ -1,14 +1,27 @@
 from db_handler import run_query
 
-def get_purchase_orders_for_supplier(supplier_id):
+def get_active_purchase_orders(supplier_id):
     """
     Retrieves all active purchase orders assigned to a specific supplier.
-    (Pending, Accepted, Shipping)
+    Includes orders with status: Pending, Accepted, Shipping.
     """
     query = """
     SELECT POID, OrderDate, ExpectedDelivery, Status
     FROM PurchaseOrders
     WHERE SupplierID = %s AND Status IN ('Pending', 'Accepted', 'Shipping')
+    ORDER BY OrderDate DESC;
+    """
+    return run_query(query, (supplier_id,))
+
+def get_archived_purchase_orders(supplier_id):
+    """
+    Retrieves archived purchase orders for a specific supplier 
+    (Declined & Delivered orders).
+    """
+    query = """
+    SELECT POID, OrderDate, ExpectedDelivery, Status
+    FROM PurchaseOrders
+    WHERE SupplierID = %s AND Status IN ('Declined', 'Delivered')  -- ✅ Includes Delivered orders
     ORDER BY OrderDate DESC;
     """
     return run_query(query, (supplier_id,))
@@ -41,16 +54,3 @@ def get_purchase_order_items(poid):
     WHERE poi.POID = %s;
     """
     return run_query(query, (poid,))
-
-def get_archived_purchase_orders(supplier_id):
-    """
-    Retrieves archived purchase orders for a specific supplier 
-    (Declined & Delivered orders).
-    """
-    query = """
-    SELECT POID, OrderDate, ExpectedDelivery, Status
-    FROM PurchaseOrders
-    WHERE SupplierID = %s AND Status IN ('Declined', 'Delivered')  -- ✅ Includes Delivered orders
-    ORDER BY OrderDate DESC;
-    """
-    return run_query(query, (supplier_id,))
