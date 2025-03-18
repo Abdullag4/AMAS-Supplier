@@ -35,7 +35,7 @@ def show_purchase_orders_page(supplier):
 
                 rows = []
                 for item in items:
-                    # item["itempicture"] is 'data:image/png;base64,<data>' or None
+                    # item["itempicture"] is 'data:image/jpg;base64,<data>' or None
                     if item["itempicture"]:
                         # Build an <img> tag for the table cell
                         img_html = f'<img src="{item["itempicture"]}" width="80" />'
