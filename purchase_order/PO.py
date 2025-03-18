@@ -1,4 +1,5 @@
 import streamlit as st
+import base64
 from purchase_order.PO_db import get_active_purchase_orders, get_purchase_order_items, update_purchase_order_status
 
 def show_track_po_page(supplier):
@@ -21,9 +22,27 @@ def show_track_po_page(supplier):
             if items:
                 st.subheader("Ordered Items")
                 for item in items:
-                    st.write(f"- **{item['itemnameenglish']}** | Quantity: {item['orderedquantity']} | Estimated Price: {item['estimatedprice'] or 'N/A'}")
+                    col1, col2 = st.columns([1, 3])
+
+                    # Convert binary image data to Base64 for display
+                    item_image = None
                     if item["itempicture"]:
-                        st.image(item["itempicture"], width=100, caption=item["itemnameenglish"])
+                        try:
+                            item_image = base64.b64encode(item["itempicture"]).decode("utf-8")
+                            item_image = f"data:image/png;base64,{item_image}"
+                        except Exception as e:
+                            st.warning(f"Error displaying image for {item['itemnameenglish']}: {e}")
+
+                    with col1:
+                        if item_image:
+                            st.image(item_image, width=100, caption=item["itemnameenglish"])
+                        else:
+                            st.write("No Image Available")
+
+                    with col2:
+                        st.write(f"**{item['itemnameenglish']}**")
+                        st.write(f"Quantity: {item['orderedquantity']}")
+                        st.write(f"Estimated Price: {item['estimatedprice'] or 'N/A'}")
 
             if po["status"] == "Pending":
                 if st.button(f"✅ Accept Order {po['poid']}", key=f"accept_{po['poid']}"):
