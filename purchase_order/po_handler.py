@@ -59,7 +59,7 @@ def get_purchase_order_items(poid):
     """
     Retrieves all items associated with a purchase order, including:
     - Item Name (English)
-    - Base64-encoded Item Image (no prefix yet)
+    - Base64-encoded Item Image (JPEG)
     - Ordered Quantity
     - Estimated Price
     """
@@ -78,9 +78,8 @@ def get_purchase_order_items(poid):
 
     # Convert images to "data:image/jpeg;base64,..." format for Streamlit
     for item in results:
-        # If not empty, add the prefix for direct <img src="...">
         if item["itempicture"]:
-            item["itempicture"] = f"data:image/jpg;base64,{item['itempicture']}"
+            item["itempicture"] = f"data:image/jpeg;base64,{item['itempicture']}"
         else:
             item["itempicture"] = None
 
