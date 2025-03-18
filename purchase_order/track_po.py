@@ -17,6 +17,11 @@ def show_purchase_orders_page(supplier):
         st.info("No active purchase orders.")
         return
 
+    # Dictionary to track the current PO ID for which the user clicked "Decline"
+    # so we can show the reason text area inline.
+    if "decline_po_show_reason" not in st.session_state:
+        st.session_state["decline_po_show_reason"] = {}
+
     # Display purchase orders
     for po in purchase_orders:
         with st.expander(f"PO ID: {po['poid']} | Status: {po['status']}"):
@@ -54,35 +59,48 @@ def show_purchase_orders_page(supplier):
                 with col1:
                     if st.button("Accept Order", key=f"accept_{po['poid']}"):
                         expected_delivery = st.date_input(
-                            f"Expected Delivery Date (PO {po['poid']})", 
+                            f"Expected Delivery Date (PO {po['poid']})",
                             key=f"date_{po['poid']}"
                         )
                         if expected_delivery:
-                            update_purchase_order_status(poid=po["poid"], status="Accepted", expected_delivery=expected_delivery)
+                            update_purchase_order_status(
+                                poid=po["poid"],
+                                status="Accepted",
+                                expected_delivery=expected_delivery
+                            )
                             st.success("Order Accepted!")
                             st.rerun()
 
-                # Decline Order with Note
+                # Decline Order
                 with col2:
-                    if st.button("Decline Order", key=f"decline_{po['poid']}"):
-                        # Show a text area for reason
-                        with st.expander(f"Reason for Declination (PO {po['poid']})", expanded=True):
-                            decline_note = st.text_area("Please provide a reason:", key=f"note_{po['poid']}")
+                    if not st.session_state["decline_po_show_reason"].get(po["poid"], False):
+                        # Show "Decline Order" button
+                        if st.button("Decline Order", key=f"decline_{po['poid']}"):
+                            # Mark that we want to show the text area for this PO
+                            st.session_state["decline_po_show_reason"][po["poid"]] = True
+                            st.rerun()
+                    else:
+                        # We are showing the text area for reason
+                        st.write("**Reason for Declination**")
+                        decline_note = st.text_area("Please provide a reason:", key=f"note_{po['poid']}")
 
-                            # Confirm or Cancel
-                            c1, c2 = st.columns(2)
-                            with c1:
-                                if st.button("Confirm Decline", key=f"confirm_decline_{po['poid']}"):
-                                    update_purchase_order_status(
-                                        poid=po["poid"], 
-                                        status="Declined", 
-                                        supplier_note=decline_note
-                                    )
-                                    st.warning("Order Declined!")
-                                    st.rerun()
-                            with c2:
-                                if st.button("Cancel", key=f"cancel_decline_{po['poid']}"):
-                                    st.rerun()  # Just refresh the page
+                        confirm_col, cancel_col = st.columns(2)
+                        with confirm_col:
+                            if st.button("Confirm Decline", key=f"confirm_decline_{po['poid']}"):
+                                update_purchase_order_status(
+                                    poid=po["poid"],
+                                    status="Declined",
+                                    supplier_note=decline_note
+                                )
+                                st.warning("Order Declined!")
+                                # Reset the session flag
+                                st.session_state["decline_po_show_reason"][po["poid"]] = False
+                                st.rerun()
+
+                        with cancel_col:
+                            if st.button("Cancel", key=f"cancel_decline_{po['poid']}"):
+                                st.session_state["decline_po_show_reason"][po["poid"]] = False
+                                st.rerun()
 
             elif po["status"] == "Accepted":
                 if st.button("Mark as Shipping", key=f"ship_{po['poid']}"):
