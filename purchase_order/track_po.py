@@ -37,7 +37,7 @@ def show_purchase_orders_page(supplier):
                 for item in items:
                     if item["itempicture"]:
                         # The final data URI is in item["itempicture"]
-                        img_html = f'<img src="{item["itempicture"]}" width="40" />'
+                        img_html = f'<img src="{item["itempicture"]}" width="30" />'
                     else:
                         img_html = "No Image"
 
