@@ -28,21 +28,17 @@ def show_purchase_orders_page(supplier):
             st.write(f"**Expected Delivery:** {po['expecteddelivery'] or 'Not Set'}")
             st.write(f"**Status:** {po['status']}")
 
-            # Show items in an HTML table
+            # Show items in a table with images in columns
             items = get_purchase_order_items(po["poid"])
             if items:
                 st.subheader("Ordered Items (with Images in Table)")
 
-                # Build a list of dict rows for DataFrame
                 rows = []
                 for item in items:
-                    # item["itempicture"] is base64 string (like "data:image/png;base64,ABCD...")
-
-                    # If no image -> "No Image"; else create HTML <img> tag
+                    # item["itempicture"] is 'data:image/png;base64,<data>' or None
                     if item["itempicture"]:
-                        # strip "data:image/png;base64," if present
-                        base64_str = item["itempicture"].replace("data:image/png;base64,", "")
-                        img_html = f'<img src="data:image/png;base64,{base64_str}" width="80"/>'
+                        # Build an <img> tag for the table cell
+                        img_html = f'<img src="{item["itempicture"]}" width="80" />'
                     else:
                         img_html = "No Image"
 
@@ -53,11 +49,8 @@ def show_purchase_orders_page(supplier):
                         "Estimated Price": item["estimatedprice"] or "N/A"
                     })
 
-                # Create DF
                 df = pd.DataFrame(rows, columns=["Picture", "Item Name", "Ordered Qty", "Estimated Price"])
-                
-                # Convert DF to HTML with escape=False so images are displayed
-                df_html = df.to_html(escape=False, index=False)
+                df_html = df.to_html(escape=False, index=False)  # escape=False to render <img> tags
                 st.markdown(df_html, unsafe_allow_html=True)
 
             # Supplier Actions
@@ -67,7 +60,10 @@ def show_purchase_orders_page(supplier):
 
                 with col1:
                     if st.button("Accept Order", key=f"accept_{po['poid']}"):
-                        expected_delivery = st.date_input(f"Expected Delivery Date (PO {po['poid']})", key=f"date_{po['poid']}")
+                        expected_delivery = st.date_input(
+                            f"Expected Delivery Date (PO {po['poid']})", 
+                            key=f"date_{po['poid']}"
+                        )
                         if expected_delivery:
                             update_purchase_order_status(
                                 poid=po["poid"], 
@@ -79,8 +75,8 @@ def show_purchase_orders_page(supplier):
 
                 # Decline with reason
                 with col2:
-                    # If we haven't clicked "Decline" yet, show button
                     if not st.session_state["decline_po_show_reason"].get(po["poid"], False):
+                        # Show "Decline Order" button
                         if st.button("Decline Order", key=f"decline_{po['poid']}"):
                             st.session_state["decline_po_show_reason"][po["poid"]] = True
                             st.rerun()
