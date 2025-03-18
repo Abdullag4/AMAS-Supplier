@@ -1,13 +1,13 @@
 from db_handler import run_query, run_transaction
 
-def get_purchase_orders_for_supplier(supplier_id):
+def get_active_purchase_orders(supplier_id):
     """
-    Retrieves all active purchase orders assigned to a specific supplier.
+    Retrieves only active purchase orders (Pending, Accepted, Shipping).
     """
     query = """
     SELECT POID, OrderDate, ExpectedDelivery, Status
     FROM PurchaseOrders
-    WHERE SupplierID = %s AND Status NOT IN ('Declined', 'Delivered')
+    WHERE SupplierID = %s AND Status IN ('Pending', 'Accepted', 'Shipping')
     ORDER BY OrderDate DESC;
     """
     return run_query(query, (supplier_id,))
