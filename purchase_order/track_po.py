@@ -1,6 +1,7 @@
 import streamlit as st
 import io
 from PIL import Image
+import pandas as pd
 from purchase_order.po_handler import (
     get_purchase_orders_for_supplier, 
     update_purchase_order_status, 
@@ -8,7 +9,7 @@ from purchase_order.po_handler import (
 )
 
 def show_purchase_orders_page(supplier):
-    """Displays active purchase orders for the supplier."""
+    """Displays active purchase orders for the supplier (in a table format)."""
     st.subheader("📦 Track Purchase Orders")
 
     # Fetch active purchase orders (Pending, Accepted, Shipping)
@@ -17,45 +18,51 @@ def show_purchase_orders_page(supplier):
         st.info("No active purchase orders.")
         return
 
-    # Dictionary to track the current PO ID for which the user clicked "Decline"
-    # so we can show the reason text area inline.
+    # Dictionary to handle the decline reason expansions
     if "decline_po_show_reason" not in st.session_state:
         st.session_state["decline_po_show_reason"] = {}
 
-    # Display purchase orders
     for po in purchase_orders:
         with st.expander(f"PO ID: {po['poid']} | Status: {po['status']}"):
             st.write(f"**Order Date:** {po['orderdate']}")
             st.write(f"**Expected Delivery:** {po['expecteddelivery'] or 'Not Set'}")
             st.write(f"**Status:** {po['status']}")
 
-            # Show ordered items
+            # Retrieve items for this order
             items = get_purchase_order_items(po["poid"])
             if items:
                 st.subheader("Ordered Items")
+                
+                # 1) Build a DataFrame for a table of items (ID, Name, Qty, Price).
+                data_for_df = []
                 for item in items:
-                    col1, col2 = st.columns([1, 3])
-                    with col1:
-                        if item["itempicture"]:
-                            try:
-                                image = Image.open(io.BytesIO(item["itempicture"]))
-                                st.image(image, width=100, caption=item["itemnameenglish"])
-                            except Exception:
-                                st.warning("Error displaying image.")
-                        else:
-                            st.write("No Image")
+                    data_for_df.append({
+                        "Item ID": item["itemid"],
+                        "Item Name": item["itemnameenglish"],
+                        "Ordered Qty": item["orderedquantity"],
+                        "Estimated Price": item["estimatedprice"] or "N/A"
+                    })
+                df = pd.DataFrame(data_for_df)
+                st.table(df)  # or st.dataframe(df)
 
-                    with col2:
-                        st.write(f"**{item['itemnameenglish']}**")
-                        st.write(f"**Ordered Quantity:** {item['orderedquantity']}")
-                        st.write(f"**Estimated Price:** {item['estimatedprice'] or 'N/A'}")
+                # 2) Optionally show images below the table.
+                st.subheader("Images")
+                for item in items:
+                    if item["itempicture"]:
+                        try:
+                            image = Image.open(io.BytesIO(item["itempicture"]))
+                            st.image(image, width=100, caption=item["itemnameenglish"])
+                        except Exception:
+                            st.warning(f"Error displaying image for item ID {item['itemid']}")
+                    else:
+                        st.write(f"No image for item ID {item['itemid']}")
 
             # Supplier Actions
             if po["status"] == "Pending":
                 st.subheader("Respond to Order")
                 col1, col2 = st.columns(2)
 
-                # Accept Order
+                # Accept
                 with col1:
                     if st.button("Accept Order", key=f"accept_{po['poid']}"):
                         expected_delivery = st.date_input(
@@ -71,16 +78,14 @@ def show_purchase_orders_page(supplier):
                             st.success("Order Accepted!")
                             st.rerun()
 
-                # Decline Order
+                # Decline (with reason)
                 with col2:
                     if not st.session_state["decline_po_show_reason"].get(po["poid"], False):
                         # Show "Decline Order" button
                         if st.button("Decline Order", key=f"decline_{po['poid']}"):
-                            # Mark that we want to show the text area for this PO
                             st.session_state["decline_po_show_reason"][po["poid"]] = True
                             st.rerun()
                     else:
-                        # We are showing the text area for reason
                         st.write("**Reason for Declination**")
                         decline_note = st.text_area("Please provide a reason:", key=f"note_{po['poid']}")
 
@@ -93,7 +98,6 @@ def show_purchase_orders_page(supplier):
                                     supplier_note=decline_note
                                 )
                                 st.warning("Order Declined!")
-                                # Reset the session flag
                                 st.session_state["decline_po_show_reason"][po["poid"]] = False
                                 st.rerun()
 
