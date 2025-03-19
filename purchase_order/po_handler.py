@@ -62,18 +62,21 @@ def get_purchase_order_items(poid):
     """
     Retrieves all items associated with a purchase order, including:
     - Item Name (English)
-    - Item Picture (any PIL-supported format: PNG, JPEG, etc.)
-      automatically detected & prefixed with the correct data URI.
-    - Ordered Quantity
-    - Estimated Price
+    - Item Picture (auto-detected format)
+    - Ordered Quantity, Estimated Price
+    - Proposed columns: SupProposedQuantity, SupProposedPrice, SupProposedDelivery, SupItemNote
     """
     query = """
     SELECT 
-        i.ItemID, 
-        i.ItemNameEnglish, 
+        i.ItemID,
+        i.ItemNameEnglish,
         encode(i.ItemPicture, 'base64') AS ItemPicture,
-        poi.OrderedQuantity, 
-        poi.EstimatedPrice
+        poi.OrderedQuantity,
+        poi.EstimatedPrice,
+        poi.SupProposedQuantity,
+        poi.SupProposedPrice,
+        poi.SupProposedDelivery,
+        poi.SupItemNote
     FROM PurchaseOrderItems poi
     JOIN Item i ON poi.ItemID = i.ItemID
     WHERE poi.POID = %s;
@@ -82,40 +85,48 @@ def get_purchase_order_items(poid):
     if not results:
         return []
 
-    # For each item, decode from base64, read with PIL to detect format, re-encode with correct prefix.
+    # Convert raw base64 to data URI for images
     for item in results:
         if item["itempicture"]:
             try:
-                # The DB returns base64 WITHOUT "data:image/..." prefix
                 raw_base64 = item["itempicture"]
-
-                # Decode from base64
                 image_bytes = base64.b64decode(raw_base64)
-
-                # Detect the image format using PIL
                 img = Image.open(io.BytesIO(image_bytes))
-                image_format = img.format  # e.g. 'JPEG', 'PNG', etc.
+                image_format = img.format or "PNG"  # default to PNG if format unknown
 
-                # We'll re-encode in base64 so we know it's valid
                 buffer = io.BytesIO()
                 img.save(buffer, format=image_format)
                 reencoded_b64 = base64.b64encode(buffer.getvalue()).decode()
 
-                # Choose the correct MIME type
-                if image_format and image_format.lower() in ["jpeg", "jpg"]:
+                # decide correct mime
+                if image_format.lower() in ["jpeg", "jpg"]:
                     mime_type = "jpeg"
                 elif image_format.lower() == "png":
                     mime_type = "png"
                 else:
-                    # fallback for other PIL formats or unknown
                     mime_type = "png"
 
-                # Build the final data URI
                 item["itempicture"] = f"data:image/{mime_type};base64,{reencoded_b64}"
             except Exception:
-                # If any error (invalid image, etc.), set None
                 item["itempicture"] = None
         else:
             item["itempicture"] = None
 
     return results
+
+def update_po_item_proposal(poid, itemid, sup_qty, sup_price, sup_delivery, sup_note):
+    """
+    Saves the supplier's proposed changes for a specific item in PurchaseOrderItems table.
+    (SupProposedQuantity, SupProposedPrice, SupProposedDelivery, SupItemNote)
+    """
+    query = """
+    UPDATE PurchaseOrderItems
+    SET 
+        SupProposedQuantity = %s,
+        SupProposedPrice = %s,
+        SupProposedDelivery = %s,
+        SupItemNote = %s
+    WHERE POID = %s
+      AND ItemID = %s;
+    """
+    run_transaction(query, (sup_qty, sup_price, sup_delivery, sup_note, poid, itemid))
