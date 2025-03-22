@@ -5,17 +5,20 @@ from db_handler import run_query, run_transaction
 
 def get_purchase_orders_for_supplier(supplier_id):
     """
-    Retrieves ONLY active purchase orders (Pending, Accepted, Shipping)
-    assigned to a specific supplier.
+    Retrieves active purchase orders (Pending, Accepted, Shipping)
+    from PurchaseOrders for this supplier.
     """
     query = """
     SELECT 
-        POID, 
-        OrderDate, 
-        ExpectedDelivery, 
-        Status
+        POID,
+        OrderDate,
+        ExpectedDelivery,
+        Status,
+        SupProposedDeliver,
+        ProposedStatus,
+        SupplierNote
     FROM PurchaseOrders
-    WHERE SupplierID = %s 
+    WHERE SupplierID = %s
       AND Status IN ('Pending', 'Accepted', 'Shipping')
     ORDER BY OrderDate DESC;
     """
@@ -23,17 +26,19 @@ def get_purchase_orders_for_supplier(supplier_id):
 
 def get_archived_purchase_orders(supplier_id):
     """
-    Retrieves archived purchase orders (Declined, Delivered, Completed).
+    Retrieves archived (Declined, Delivered, Completed) purchase orders for this supplier.
     """
     query = """
-    SELECT 
-        POID, 
-        OrderDate, 
-        ExpectedDelivery, 
+    SELECT
+        POID,
+        OrderDate,
+        ExpectedDelivery,
         Status,
+        SupProposedDeliver,
+        ProposedStatus,
         SupplierNote
     FROM PurchaseOrders
-    WHERE SupplierID = %s 
+    WHERE SupplierID = %s
       AND Status IN ('Declined', 'Delivered', 'Completed')
     ORDER BY OrderDate DESC;
     """
@@ -41,42 +46,50 @@ def get_archived_purchase_orders(supplier_id):
 
 def update_purchase_order_status(poid, status, expected_delivery=None, supplier_note=None):
     """
-    Updates the status of a purchase order.
-    - If `expected_delivery` is provided, updates ExpectedDelivery.
-    - If `supplier_note` is provided, updates SupplierNote (usually when declining).
+    Updates main PO status and (optionally) ExpectedDelivery and SupplierNote (if e.g. declining).
+    Does NOT set ProposedStatus or SupProposedDeliver. Use update_po_order_proposal for that.
     """
     query = """
     UPDATE PurchaseOrders
-    SET 
-        Status = %s, 
+    SET
+        Status = %s,
         ExpectedDelivery = COALESCE(%s, ExpectedDelivery),
         SupplierNote = COALESCE(%s, SupplierNote)
     WHERE POID = %s;
     """
-    try:
-        run_transaction(query, (status, expected_delivery, supplier_note, poid))
-    except Exception as e:
-        print(f"🚨 Error updating PO {poid}: {e}")
+    run_transaction(query, (status, expected_delivery, supplier_note, poid))
+
+def update_po_order_proposal(poid, proposed_deliver=None, proposed_status=None, supplier_note=None):
+    """
+    Lets the supplier propose an overall new Delivery Date (SupProposedDeliver)
+    and set ProposedStatus to e.g. 'Proposed', plus optionally a note.
+    """
+    query = """
+    UPDATE PurchaseOrders
+    SET
+        SupProposedDeliver = COALESCE(%s, SupProposedDeliver),
+        ProposedStatus = COALESCE(%s, ProposedStatus),
+        SupplierNote = COALESCE(%s, SupplierNote)
+    WHERE POID = %s;
+    """
+    run_transaction(query, (proposed_deliver, proposed_status, supplier_note, poid))
 
 def get_purchase_order_items(poid):
     """
-    Retrieves all items associated with a purchase order, including:
-    - Item Name (English)
-    - Item Picture (auto-detected format)
-    - Ordered Quantity, Estimated Price
-    - Proposed columns: SupProposedQuantity, SupProposedPrice, SupProposedDelivery, SupItemNote
+    Retrieves items from PurchaseOrderItems, including:
+    - ItemNameEnglish, ItemPicture (auto-detect format)
+    - OrderedQuantity, EstimatedPrice
+    - SupProposedQuantity, SupProposedPrice
     """
     query = """
-    SELECT 
+    SELECT
         i.ItemID,
         i.ItemNameEnglish,
         encode(i.ItemPicture, 'base64') AS ItemPicture,
         poi.OrderedQuantity,
         poi.EstimatedPrice,
         poi.SupProposedQuantity,
-        poi.SupProposedPrice,
-        poi.SupProposedDelivery,
-        poi.SupItemNote
+        poi.SupProposedPrice
     FROM PurchaseOrderItems poi
     JOIN Item i ON poi.ItemID = i.ItemID
     WHERE poi.POID = %s;
@@ -85,20 +98,21 @@ def get_purchase_order_items(poid):
     if not results:
         return []
 
-    # Convert raw base64 to data URI for images
+    # Convert each item’s base64 → data URI for display
     for item in results:
         if item["itempicture"]:
             try:
-                raw_base64 = item["itempicture"]
-                image_bytes = base64.b64decode(raw_base64)
+                raw_b64 = item["itempicture"]
+                image_bytes = base64.b64decode(raw_b64)
+
+                # Detect image format
                 img = Image.open(io.BytesIO(image_bytes))
-                image_format = img.format or "PNG"  # default to PNG if format unknown
+                image_format = img.format or "PNG"
 
                 buffer = io.BytesIO()
                 img.save(buffer, format=image_format)
                 reencoded_b64 = base64.b64encode(buffer.getvalue()).decode()
 
-                # decide correct mime
                 if image_format.lower() in ["jpeg", "jpg"]:
                     mime_type = "jpeg"
                 elif image_format.lower() == "png":
@@ -114,19 +128,18 @@ def get_purchase_order_items(poid):
 
     return results
 
-def update_po_item_proposal(poid, itemid, sup_qty, sup_price, sup_delivery, sup_note):
+def update_po_item_proposal(poid, itemid, sup_qty, sup_price):
     """
-    Saves the supplier's proposed changes for a specific item in PurchaseOrderItems table.
-    (SupProposedQuantity, SupProposedPrice, SupProposedDelivery, SupItemNote)
+    Saves proposed changes for this item:
+      - SupProposedQuantity
+      - SupProposedPrice
     """
     query = """
     UPDATE PurchaseOrderItems
-    SET 
-        SupProposedQuantity = %s,
-        SupProposedPrice = %s,
-        SupProposedDelivery = %s,
-        SupItemNote = %s
+    SET
+      SupProposedQuantity = %s,
+      SupProposedPrice = %s
     WHERE POID = %s
       AND ItemID = %s;
     """
-    run_transaction(query, (sup_qty, sup_price, sup_delivery, sup_note, poid, itemid))
+    run_transaction(query, (sup_qty, sup_price, poid, itemid))
